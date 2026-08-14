@@ -7,20 +7,33 @@ private struct ZaiEnvelope<T: Decodable>: Decodable {
     let data: T?
 }
 
-private struct ZaiQuotaLimitResponse: Decodable {
+struct ZaiQuotaLimitResponse: Decodable {
     let limits: [ZaiQuotaLimitItem]?
 }
 
-private struct ZaiQuotaLimitItem: Decodable {
+struct ZaiQuotaLimitItem: Decodable {
     let type: String
     let percentage: Double?
     let currentValue: Int?
     let total: Int?
     let nextResetTime: Int64?
+    /// CREDIT_LIMIT items (lite tier) report capacity as `usage` and leftover as `remaining`
+    /// instead of `total`/`currentValue` — keep them so credit-based plans can render.
+    let usage: Int?
+    let remaining: Int?
+
+    /// Resolved total capacity: prefers `total` (TOKENS_LIMIT / TIME_LIMIT),
+    /// falls back to `usage` (CREDIT_LIMIT).
+    var resolvedTotal: Int? {
+        total ?? usage
+    }
 
     var computedPercentage: Double? {
-        guard let currentValue = currentValue, let total = total, total > 0 else { return nil }
-        return (Double(currentValue) / Double(total)) * 100
+        if let percentage {
+            return percentage
+        }
+        guard let currentValue, let resolvedTotal, resolvedTotal > 0 else { return nil }
+        return (Double(currentValue) / Double(resolvedTotal)) * 100
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -29,6 +42,8 @@ private struct ZaiQuotaLimitItem: Decodable {
         case currentValue
         case total
         case nextResetTime
+        case usage
+        case remaining
     }
 
     init(from decoder: Decoder) throws {
@@ -38,6 +53,8 @@ private struct ZaiQuotaLimitItem: Decodable {
         currentValue = Self.decodeInt(container, forKey: .currentValue)
         total = Self.decodeInt(container, forKey: .total)
         nextResetTime = Self.decodeInt64(container, forKey: .nextResetTime)
+        usage = Self.decodeInt(container, forKey: .usage)
+        remaining = Self.decodeInt(container, forKey: .remaining)
     }
 
     private static func decodeDouble(_ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Double? {
@@ -178,7 +195,11 @@ final class ZaiCodingPlanProvider: ProviderProtocol {
             throw ProviderError.decodingError("Missing quota limits")
         }
 
+        // Prefer the standard quota windows; lite/credit plans only expose
+        // CREDIT_LIMIT items, so fall back to the first credit item as the
+        // token-equivalent window when no TOKENS_LIMIT / TIME_LIMIT exists.
         let tokenLimit = limits.first { $0.type.uppercased() == "TOKENS_LIMIT" }
+            ?? limits.first { $0.type.uppercased() == "CREDIT_LIMIT" }
         let mcpLimit = limits.first { $0.type.uppercased() == "TIME_LIMIT" }
 
         let tokenUsagePercent = tokenLimit?.percentage ?? tokenLimit?.computedPercentage
@@ -227,11 +248,11 @@ final class ZaiCodingPlanProvider: ProviderProtocol {
             tokenUsagePercent: tokenUsagePercent,
             tokenUsageReset: dateFromMilliseconds(tokenLimit?.nextResetTime),
             tokenUsageUsed: tokenLimit?.currentValue,
-            tokenUsageTotal: tokenLimit?.total,
+            tokenUsageTotal: tokenLimit?.resolvedTotal,
             mcpUsagePercent: mcpUsagePercent,
             mcpUsageReset: dateFromMilliseconds(mcpLimit?.nextResetTime),
             mcpUsageUsed: mcpLimit?.currentValue,
-            mcpUsageTotal: mcpLimit?.total,
+            mcpUsageTotal: mcpLimit?.resolvedTotal,
             modelUsageTokens: modelUsageTotals?.totalTokensUsage,
             modelUsageCalls: modelUsageTotals?.totalModelCallCount,
             toolNetworkSearchCount: toolUsageTotals?.totalNetworkSearchCount,

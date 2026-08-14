@@ -862,7 +862,9 @@ final class StatusBarController: NSObject {
             total += copilot.netBilledAmount
         }
 
-        for (_, result) in providerResults {
+        for (identifier, result) in providerResults {
+            // DeepSeek's cost field carries the prepaid balance, not spend.
+            if identifier == .deepSeek { continue }
             if case .payAsYouGo(_, let cost, _) = result.usage, let cost = cost {
                 total += cost
             }
@@ -1033,7 +1035,7 @@ final class StatusBarController: NSObject {
             add(details?.fiveHourUsage, priority: .hourly)
         case .tavilySearch, .braveSearch:
             add(details?.mcpUsagePercent, priority: .monthly)
-        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen:
+        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek:
             break
         }
 
@@ -1659,7 +1661,7 @@ final class StatusBarController: NSObject {
 
          var hasPayAsYouGo = false
 
-            let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen]
+            let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek]
             for identifier in payAsYouGoOrder {
                 guard isProviderEnabled(identifier) else { continue }
 
@@ -1678,8 +1680,14 @@ final class StatusBarController: NSObject {
                     if case .payAsYouGo(_, let cost, _) = result.usage {
                         hasPayAsYouGo = true
                         let costValue = cost ?? 0.0
+                        let title: String
+                        if identifier == .deepSeek {
+                            title = String(format: "DeepSeek (¥%.2f)", costValue)
+                        } else {
+                            title = String(format: "%@ ($%.2f)", identifier.displayName, costValue)
+                        }
                         let item = NSMenuItem(
-                            title: String(format: "%@ ($%.2f)", identifier.displayName, costValue),
+                            title: title,
                             action: nil, keyEquivalent: ""
                         )
                         item.image = iconForProvider(identifier)
@@ -3081,6 +3089,8 @@ final class StatusBarController: NSObject {
             image = NSImage(named: "TavilyIcon")
         case .braveSearch:
             image = NSImage(named: "BraveSearchIcon")
+        case .deepSeek:
+            image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
         }
 
          // Keep consistent icon sizing and make Gemini slightly larger.

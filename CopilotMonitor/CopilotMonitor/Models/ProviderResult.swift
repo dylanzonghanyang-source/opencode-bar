@@ -157,6 +157,11 @@ struct DetailedUsage {
     let creditsBalance: Double?
     let planType: String?
 
+    // DeepSeek balance details (pay-as-you-go CNY balance)
+    let balanceCurrency: String?
+    let balanceGranted: Double?
+    let balanceToppedUp: Double?
+
     // Chutes-specific value cap tracking
     let chutesMonthlyValueCapUSD: Double?
     let chutesMonthlyValueUsedUSD: Double?
@@ -265,6 +270,9 @@ struct DetailedUsage {
         sparkSecondaryWindowHours: Int? = nil,
         creditsBalance: Double? = nil,
         planType: String? = nil,
+        balanceCurrency: String? = nil,
+        balanceGranted: Double? = nil,
+        balanceToppedUp: Double? = nil,
         chutesMonthlyValueCapUSD: Double? = nil,
         chutesMonthlyValueUsedUSD: Double? = nil,
         chutesMonthlyValueUsedPercent: Double? = nil,
@@ -348,6 +356,9 @@ struct DetailedUsage {
         self.sparkSecondaryWindowHours = sparkSecondaryWindowHours
         self.creditsBalance = creditsBalance
         self.planType = planType
+        self.balanceCurrency = balanceCurrency
+        self.balanceGranted = balanceGranted
+        self.balanceToppedUp = balanceToppedUp
         self.chutesMonthlyValueCapUSD = chutesMonthlyValueCapUSD
         self.chutesMonthlyValueUsedUSD = chutesMonthlyValueUsedUSD
         self.chutesMonthlyValueUsedPercent = chutesMonthlyValueUsedPercent
