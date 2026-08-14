@@ -416,7 +416,7 @@ extension DetailedUsage: Codable {
         case codexPrimaryWindowLabel, codexPrimaryWindowHours, codexSecondaryWindowLabel, codexSecondaryWindowHours
         case sparkUsage, sparkReset, sparkSecondaryUsage, sparkSecondaryReset, sparkWindowLabel
         case sparkPrimaryWindowLabel, sparkPrimaryWindowHours, sparkSecondaryWindowLabel, sparkSecondaryWindowHours
-        case creditsBalance, planType
+        case creditsBalance, planType, balanceCurrency, balanceGranted, balanceToppedUp
         case chutesMonthlyValueCapUSD, chutesMonthlyValueUsedUSD, chutesMonthlyValueUsedPercent
         case openCodeGoMonthlyUsage, openCodeGoMonthlyReset, openCodeGoModelCount
         case extraUsageEnabled
@@ -472,6 +472,9 @@ extension DetailedUsage: Codable {
         sparkSecondaryWindowHours = try container.decodeIfPresent(Int.self, forKey: .sparkSecondaryWindowHours)
         creditsBalance = try container.decodeIfPresent(Double.self, forKey: .creditsBalance)
         planType = try container.decodeIfPresent(String.self, forKey: .planType)
+        balanceCurrency = try container.decodeIfPresent(String.self, forKey: .balanceCurrency)
+        balanceGranted = try container.decodeIfPresent(Double.self, forKey: .balanceGranted)
+        balanceToppedUp = try container.decodeIfPresent(Double.self, forKey: .balanceToppedUp)
         chutesMonthlyValueCapUSD = try container.decodeIfPresent(Double.self, forKey: .chutesMonthlyValueCapUSD)
         chutesMonthlyValueUsedUSD = try container.decodeIfPresent(Double.self, forKey: .chutesMonthlyValueUsedUSD)
         chutesMonthlyValueUsedPercent = try container.decodeIfPresent(Double.self, forKey: .chutesMonthlyValueUsedPercent)
@@ -558,6 +561,9 @@ extension DetailedUsage: Codable {
         try container.encodeIfPresent(sparkSecondaryWindowHours, forKey: .sparkSecondaryWindowHours)
         try container.encodeIfPresent(creditsBalance, forKey: .creditsBalance)
         try container.encodeIfPresent(planType, forKey: .planType)
+        try container.encodeIfPresent(balanceCurrency, forKey: .balanceCurrency)
+        try container.encodeIfPresent(balanceGranted, forKey: .balanceGranted)
+        try container.encodeIfPresent(balanceToppedUp, forKey: .balanceToppedUp)
         try container.encodeIfPresent(chutesMonthlyValueCapUSD, forKey: .chutesMonthlyValueCapUSD)
         try container.encodeIfPresent(chutesMonthlyValueUsedUSD, forKey: .chutesMonthlyValueUsedUSD)
         try container.encodeIfPresent(chutesMonthlyValueUsedPercent, forKey: .chutesMonthlyValueUsedPercent)
