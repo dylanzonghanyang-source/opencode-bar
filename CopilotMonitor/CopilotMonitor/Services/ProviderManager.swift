@@ -48,7 +48,8 @@ actor ProviderManager {
             TavilySearchProvider(),
             BraveSearchProvider(),
             DeepSeekProvider(),
-            DashScopeProvider()
+            DashScopeProvider(),
+            TimiccProvider()
         ]
     }
 

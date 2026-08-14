@@ -176,6 +176,8 @@ final class MultiProviderStatusBarIconView: NSView {
             iconName = "dollarsign.circle"
         case .dashScope:
             iconName = "yensign.circle"
+        case .timicc:
+            iconName = "dollarsign.circle"
         }
 
         let icon: NSImage

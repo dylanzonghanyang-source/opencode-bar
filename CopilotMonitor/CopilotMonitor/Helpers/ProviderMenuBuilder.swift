@@ -74,6 +74,13 @@ extension StatusBarController {
                 submenu.addItem(item)
             }
 
+        case .timicc:
+            if let balance = details.creditsBalance {
+                let item = NSMenuItem()
+                item.view = createDisabledLabelView(text: String(format: "Balance: %@%.2f", details.balanceCurrencySymbol, balance))
+                submenu.addItem(item)
+            }
+
         case .dashScope:
             for (label, value) in Self.dashScopeBalanceRows(details: details) {
                 let item = NSMenuItem()

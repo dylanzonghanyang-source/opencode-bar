@@ -218,6 +218,7 @@ struct OpenCodeAuth: Codable {
     let githubCopilot: OAuth?
     let openrouter: APIKey?
     let deepseek: APIKey?
+    let timicc: APIKey?
     let opencode: APIKey?
     let openCodeGo: APIKey?
     let kimiForCoding: APIKey?
@@ -228,7 +229,7 @@ struct OpenCodeAuth: Codable {
     let chutes: APIKey?
 
     enum CodingKeys: String, CodingKey {
-        case anthropic, openai, openrouter, opencode, synthetic, chutes, deepseek
+        case anthropic, openai, openrouter, opencode, synthetic, chutes, deepseek, timicc
         case openCodeGo = "opencode-go"
         case githubCopilot = "github-copilot"
         case kimiForCoding = "kimi-for-coding"
@@ -244,6 +245,7 @@ struct OpenCodeAuth: Codable {
         githubCopilot: OAuth?,
         openrouter: APIKey?,
         deepseek: APIKey?,
+        timicc: APIKey?,
         opencode: APIKey?,
         openCodeGo: APIKey?,
         kimiForCoding: APIKey?,
@@ -259,6 +261,7 @@ struct OpenCodeAuth: Codable {
         self.githubCopilot = githubCopilot
         self.openrouter = openrouter
         self.deepseek = deepseek
+        self.timicc = timicc
         self.opencode = opencode
         self.openCodeGo = openCodeGo
         self.kimiForCoding = kimiForCoding
@@ -280,6 +283,7 @@ struct OpenCodeAuth: Codable {
         githubCopilot = Self.decodeLossyIfPresent(OAuth.self, from: container, forKey: .githubCopilot)
         openrouter = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .openrouter)
         deepseek = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .deepseek)
+        timicc = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .timicc)
         opencode = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .opencode)
         openCodeGo = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .openCodeGo)
         kimiForCoding = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .kimiForCoding)
@@ -295,6 +299,7 @@ struct OpenCodeAuth: Codable {
            githubCopilot == nil,
            openrouter == nil,
            deepseek == nil,
+           timicc == nil,
            opencode == nil,
            openCodeGo == nil,
            kimiForCoding == nil,
@@ -333,6 +338,7 @@ struct OpenCodeAuth: Codable {
         try container.encodeIfPresent(githubCopilot, forKey: .githubCopilot)
         try container.encodeIfPresent(openrouter, forKey: .openrouter)
         try container.encodeIfPresent(deepseek, forKey: .deepseek)
+        try container.encodeIfPresent(timicc, forKey: .timicc)
         try container.encodeIfPresent(opencode, forKey: .opencode)
         try container.encodeIfPresent(openCodeGo, forKey: .openCodeGo)
         try container.encodeIfPresent(kimiForCoding, forKey: .kimiForCoding)
@@ -4246,6 +4252,13 @@ final class TokenManager: @unchecked Sendable {
     func getDeepSeekAPIKey() -> String? {
         guard let auth = readOpenCodeAuth() else { return nil }
         return auth.deepseek?.key
+    }
+
+    /// Gets TIMICC API key from OpenCode auth
+    /// - Returns: API key string if available, nil otherwise
+    func getTimiccAPIKey() -> String? {
+        guard let auth = readOpenCodeAuth() else { return nil }
+        return auth.timicc?.key
     }
 
     func getOpenCodeAPIKey() -> String? {

@@ -972,7 +972,10 @@ final class StatusBarController: NSObject {
             total += copilot.netBilledAmount
         }
 
-        for (_, result) in providerResults {
+        for (identifier, result) in providerResults {
+            // Balance-style providers carry the prepaid balance in `cost`, not spend.
+            if identifier == .deepSeek || identifier == .dashScope || identifier == .timicc { continue }
+
             if case .payAsYouGo(_, let cost, _) = result.usage, let cost = cost {
                 total += cost
             }
@@ -1144,7 +1147,7 @@ final class StatusBarController: NSObject {
             add(details?.fiveHourUsage, priority: .hourly)
         case .tavilySearch, .braveSearch:
             add(details?.mcpUsagePercent, priority: .monthly)
-        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .dashScope:
+        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .dashScope, .timicc:
             break
         }
 
@@ -1756,6 +1759,7 @@ final class StatusBarController: NSObject {
         var insertIndex = separatorIndex + 1
 
          // QUOTA section comes first in the main menu information architecture.
+
          let quotaHeader = NSMenuItem()
          quotaHeader.view = createHeaderView(title: "QUOTA")
          quotaHeader.tag = 999
@@ -2231,7 +2235,7 @@ final class StatusBarController: NSObject {
 
         var hasPayAsYouGo = false
 
-        let payAsYouGoOrder: [ProviderIdentifier] = [.deepSeek, .dashScope, .openRouter, .openCodeZen]
+        let payAsYouGoOrder: [ProviderIdentifier] = [.deepSeek, .dashScope, .timicc, .openRouter, .openCodeZen]
         for identifier in payAsYouGoOrder {
             guard isProviderEnabled(identifier) else { continue }
 
@@ -3188,7 +3192,9 @@ final class StatusBarController: NSObject {
         case .deepSeek:
             image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
         case .dashScope:
-            image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
+            image = NSImage(systemSymbolName: ProviderIdentifier.dashScope.iconName, accessibilityDescription: identifier.displayName)
+        case .timicc:
+            image = NSImage(systemSymbolName: ProviderIdentifier.timicc.iconName, accessibilityDescription: identifier.displayName)
         }
 
          // Keep consistent icon sizing and make Gemini slightly larger.
