@@ -47,7 +47,8 @@ actor ProviderManager {
             SyntheticProvider(),
             TavilySearchProvider(),
             BraveSearchProvider(),
-            DeepSeekProvider()
+            DeepSeekProvider(),
+            TimiccProvider()
         ]
     }
 

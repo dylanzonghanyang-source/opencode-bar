@@ -162,6 +162,17 @@ struct DetailedUsage {
     let balanceGranted: Double?
     let balanceToppedUp: Double?
 
+    /// Currency symbol for `balanceCurrency` (e.g. "USD" -> "$", "CNY" -> "¥").
+    /// Falls back to the raw code with a trailing space for unknown currencies.
+    var balanceCurrencySymbol: String {
+        switch balanceCurrency?.uppercased() {
+        case "USD", "US": return "$"
+        case "CNY", "RMB": return "¥"
+        case let code? where !code.isEmpty: return code + " "
+        default: return ""
+        }
+    }
+
     // Chutes-specific value cap tracking
     let chutesMonthlyValueCapUSD: Double?
     let chutesMonthlyValueUsedUSD: Double?

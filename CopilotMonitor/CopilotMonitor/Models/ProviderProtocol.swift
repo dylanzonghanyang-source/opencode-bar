@@ -32,6 +32,7 @@ enum ProviderIdentifier: String, CaseIterable {
     case tavilySearch = "tavily_search"
     case braveSearch = "brave_search"
     case deepSeek = "deepseek"
+    case timicc
 
     var displayName: String {
         switch self {
@@ -79,6 +80,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "Brave Search"
         case .deepSeek:
             return "DeepSeek"
+        case .timicc:
+            return "Timicc"
         }
     }
 
@@ -128,6 +131,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "Brave"
         case .deepSeek:
             return "DeepSeek"
+        case .timicc:
+            return "Timicc"
         }
     }
 
@@ -177,6 +182,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "BraveSearchIcon"
         case .deepSeek:
             return "network"
+        case .timicc:
+            return "t.circle"
         }
     }
 }

@@ -863,8 +863,8 @@ final class StatusBarController: NSObject {
         }
 
         for (identifier, result) in providerResults {
-            // DeepSeek's cost field carries the prepaid balance, not spend.
-            if identifier == .deepSeek { continue }
+            // Balance-style providers carry the prepaid balance in `cost`, not spend.
+            if identifier == .deepSeek || identifier == .timicc { continue }
             if case .payAsYouGo(_, let cost, _) = result.usage, let cost = cost {
                 total += cost
             }
@@ -1035,7 +1035,7 @@ final class StatusBarController: NSObject {
             add(details?.fiveHourUsage, priority: .hourly)
         case .tavilySearch, .braveSearch:
             add(details?.mcpUsagePercent, priority: .monthly)
-        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek:
+        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .timicc:
             break
         }
 
@@ -1661,7 +1661,7 @@ final class StatusBarController: NSObject {
 
          var hasPayAsYouGo = false
 
-            let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek]
+            let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek, .timicc]
             for identifier in payAsYouGoOrder {
                 guard isProviderEnabled(identifier) else { continue }
 
@@ -1681,8 +1681,8 @@ final class StatusBarController: NSObject {
                         hasPayAsYouGo = true
                         let costValue = cost ?? 0.0
                         let title: String
-                        if identifier == .deepSeek {
-                            title = String(format: "DeepSeek (¥%.2f)", costValue)
+                        if let symbol = result.details?.balanceCurrencySymbol, !symbol.isEmpty {
+                            title = String(format: "%@ (%@%.2f)", identifier.displayName, symbol, costValue)
                         } else {
                             title = String(format: "%@ ($%.2f)", identifier.displayName, costValue)
                         }
@@ -3090,6 +3090,8 @@ final class StatusBarController: NSObject {
         case .braveSearch:
             image = NSImage(named: "BraveSearchIcon")
         case .deepSeek:
+            image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
+        case .timicc:
             image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
         }
 

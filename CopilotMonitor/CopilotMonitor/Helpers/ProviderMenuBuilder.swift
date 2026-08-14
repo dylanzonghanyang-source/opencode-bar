@@ -67,20 +67,20 @@ extension StatusBarController {
         let subscriptionAccountId = resolvedSubscriptionAccountId(details: details, fallback: accountId)
 
         switch identifier {
-        case .deepSeek:
+        case .deepSeek, .timicc:
             if let balance = details.creditsBalance {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Balance: ¥%.2f", balance))
+                item.view = createDisabledLabelView(text: String(format: "Balance: %@%.2f", details.balanceCurrencySymbol, balance))
                 submenu.addItem(item)
             }
             if let toppedUp = details.balanceToppedUp {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Topped-up: ¥%.2f", toppedUp))
+                item.view = createDisabledLabelView(text: String(format: "Topped-up: %@%.2f", details.balanceCurrencySymbol, toppedUp))
                 submenu.addItem(item)
             }
             if let granted = details.balanceGranted {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Granted: ¥%.2f", granted))
+                item.view = createDisabledLabelView(text: String(format: "Granted: %@%.2f", details.balanceCurrencySymbol, granted))
                 submenu.addItem(item)
             }
 

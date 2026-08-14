@@ -174,6 +174,8 @@ final class MultiProviderStatusBarIconView: NSView {
             iconName = "BraveSearchIcon"
         case .deepSeek:
             iconName = "dollarsign.circle"
+        case .timicc:
+            iconName = "dollarsign.circle"
         }
 
         let icon: NSImage
