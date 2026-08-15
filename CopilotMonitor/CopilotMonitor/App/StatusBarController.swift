@@ -4266,11 +4266,11 @@ extension StatusBarController {
                 usage: .quotaBased(remaining: 88, entitlement: 100, overagePermitted: false),
                 details: DetailedUsage(
                     tokenUsagePercent: 12.0,
-                    weeklyUsagePercent: 1.0,
-                    mcpUsagePercent: 2.0,
                     tokenUsageReset: oneDayFromNow,
-                    weeklyUsageReset: sevenDaysFromNow,
-                    mcpUsageReset: oneDayFromNow
+                    mcpUsagePercent: 2.0,
+                    mcpUsageReset: oneDayFromNow,
+                    weeklyUsagePercent: 1.0,
+                    weeklyUsageReset: sevenDaysFromNow
                 ),
                 accounts: [
                     ProviderAccountResult(
@@ -4279,8 +4279,8 @@ extension StatusBarController {
                         usage: .quotaBased(remaining: 88, entitlement: 100, overagePermitted: false),
                         details: DetailedUsage(
                             tokenUsagePercent: 12.0,
-                            weeklyUsagePercent: 1.0,
-                            mcpUsagePercent: 2.0
+                            mcpUsagePercent: 2.0,
+                            weeklyUsagePercent: 1.0
                         )
                     ),
                     ProviderAccountResult(
