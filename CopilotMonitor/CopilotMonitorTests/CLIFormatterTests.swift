@@ -428,4 +428,37 @@ final class CLIFormatterTests: XCTestCase {
                                      "Separator must be at least as wide as every data row. Row: \(row)")
         }
     }
+    // MARK: - Z.AI CREDIT_LIMIT (lite tier) formatter tests
+
+    private func zaiCreditOnlyResult() -> ProviderResult {
+        let details = DetailedUsage(
+            tokenUsagePercent: 1,
+            tokenUsageReset: Date(timeIntervalSince1970: 1786717056),
+            tokenUsageUsed: 27,
+            tokenUsageTotal: 2000,
+            weeklyUsagePercent: 1,
+            weeklyUsageReset: Date(timeIntervalSince1970: 1787301777),
+            weeklyUsageUsed: 27,
+            weeklyUsageTotal: 10000
+        )
+        let usage = ProviderUsage.quotaBased(remaining: 99, entitlement: 100, overagePermitted: false)
+        return ProviderResult(usage: usage, details: details)
+    }
+
+    /// Table must surface both the 5-hour session window and the weekly window.
+    func testZaiTableShowsBothCreditWindows() {
+        let output = TableFormatter.format([.zaiCodingPlan: zaiCreditOnlyResult()])
+        XCTAssertTrue(output.contains("1%,1%"), "Usage column should show both windows, got:\n\(output)")
+        XCTAssertTrue(output.contains("99/100 remaining"), "Metrics should show overall remaining, got:\n\(output)")
+    }
+
+    /// JSON must include the weekly window fields alongside token/MCP.
+    func testZaiJSONIncludesWeeklyWindow() throws {
+        let json = try JSONFormatter.format([.zaiCodingPlan: zaiCreditOnlyResult()])
+        XCTAssertTrue(json.contains("\"tokenUsagePercent\" : 1"), "Missing tokenUsagePercent in:\n\(json)")
+        XCTAssertTrue(json.contains("\"weeklyUsagePercent\" : 1"), "Missing weeklyUsagePercent in:\n\(json)")
+        XCTAssertTrue(json.contains("\"weeklyUsageUsed\" : 27"), "Missing weeklyUsageUsed in:\n\(json)")
+        XCTAssertTrue(json.contains("\"weeklyUsageTotal\" : 10000"), "Missing weeklyUsageTotal in:\n\(json)")
+        XCTAssertTrue(json.contains("\"weeklyResetsAt\""), "Missing weeklyResetsAt in:\n\(json)")
+    }
 }
