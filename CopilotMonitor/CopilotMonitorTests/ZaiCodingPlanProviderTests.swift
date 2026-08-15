@@ -442,6 +442,28 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         }
     }
 
+    /// A Z.AI weekly detail window with a reset timestamp must render the
+    /// existing reset row through the shared usage-window helper.
+    @MainActor
+    func testZaiWeeklyDetailWindowRendersResetRow() {
+        let details = DetailedUsage(
+            weeklyUsagePercent: 27,
+            weeklyUsageReset: Date(timeIntervalSince1970: 1_787_301_777)
+        )
+        let submenu = StatusBarController().createDetailSubmenu(
+            details,
+            identifier: .zaiCodingPlan
+        )
+        let renderedTexts = submenu.items.flatMap { item in
+            item.view?.subviews.compactMap { ($0 as? NSTextField)?.stringValue } ?? []
+        }
+
+        XCTAssertTrue(
+            renderedTexts.contains { $0.hasPrefix("Resets:") },
+            "Weekly detail should render a reset row, got: \(renderedTexts)"
+        )
+    }
+
     /// A details payload carrying only weekly fields must count as non-empty so
     /// the detail submenu is not hidden.
     func testHasAnyValueIncludesWeeklyFields() {

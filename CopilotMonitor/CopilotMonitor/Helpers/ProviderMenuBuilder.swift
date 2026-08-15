@@ -738,6 +738,7 @@ extension StatusBarController {
                     label: "Weekly (7d)",
                     usagePercent: weeklyUsage,
                     resetDate: details.weeklyUsageReset,
+                    windowHours: 24 * 7,
                     isMonthly: false
                 )
                 items.forEach { submenu.addItem($0) }
