@@ -335,6 +335,17 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
     /// the top-level provider row, including a weekly-only account.
     @MainActor
     func testZaiTopLevelRowsRenderAllActiveWindows() {
+        let githubStarPromptKey = "githubStarPromptDismissed"
+        let previousPromptValue = UserDefaults.standard.object(forKey: githubStarPromptKey)
+        UserDefaults.standard.set(true, forKey: githubStarPromptKey)
+        defer {
+            if let previousPromptValue {
+                UserDefaults.standard.set(previousPromptValue, forKey: githubStarPromptKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: githubStarPromptKey)
+            }
+        }
+
         let controller = StatusBarController()
         controller.loadDemoData()
 
