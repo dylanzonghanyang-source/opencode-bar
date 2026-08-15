@@ -342,7 +342,7 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
             return XCTFail("StatusBarController did not build its main menu")
         }
         let rows = menu.items
-            .map(\.attributedTitle.string)
+            .compactMap { $0.attributedTitle?.string }
             .filter { $0.hasPrefix(ProviderIdentifier.zaiCodingPlan.displayName) }
 
         XCTAssertEqual(rows.count, 2, "Expected two real Z.AI rows, got: \(rows)")
@@ -364,6 +364,5 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertTrue(DetailedUsage(weeklyUsageTotal: 10000).hasAnyValue)
         XCTAssertFalse(DetailedUsage().hasAnyValue)
     }
-
 
 }
