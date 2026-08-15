@@ -38,6 +38,29 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         return URLSession(configuration: configuration)
     }
 
+    /// Read the menu produced by the real controller build path without adding
+    /// a production-only test accessor to StatusBarController.
+    @MainActor
+    private func menu(from controller: StatusBarController) -> NSMenu? {
+        guard let value = Mirror(reflecting: controller).children
+            .first(where: { $0.label == "menu" })?.value else {
+            return nil
+        }
+        return unwrapMenu(value)
+    }
+
+    private func unwrapMenu(_ value: Any) -> NSMenu? {
+        if let menu = value as? NSMenu {
+            return menu
+        }
+        let mirror = Mirror(reflecting: value)
+        guard mirror.displayStyle == .optional,
+              let child = mirror.children.first else {
+            return nil
+        }
+        return unwrapMenu(child.value)
+    }
+
     override func tearDown() {
         MockURLProtocol.requestHandler = nil
         super.tearDown()
@@ -308,6 +331,30 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertTrue(percents.contains(2), "weeklyUsagePercent missing from change detection: \(percents)")
     }
 
+    /// The real demo/menu build path must render every active Z.AI window on
+    /// the top-level provider row, including a weekly-only account.
+    @MainActor
+    func testZaiTopLevelRowsRenderAllActiveWindows() {
+        let controller = StatusBarController()
+        controller.loadDemoData()
+
+        guard let menu = menu(from: controller) else {
+            return XCTFail("StatusBarController did not build its main menu")
+        }
+        let rows = menu.items
+            .map(\.attributedTitle.string)
+            .filter { $0.hasPrefix(ProviderIdentifier.zaiCodingPlan.displayName) }
+
+        XCTAssertEqual(rows.count, 2, "Expected two real Z.AI rows, got: \(rows)")
+        XCTAssertTrue(rows.contains { $0.contains("12%, 1%, 2%") }, "Missing token/weekly/MCP row: \(rows)")
+
+        let weeklyOnlyRows = rows.filter { $0.contains("1%") && !$0.contains("12%") }
+        XCTAssertEqual(weeklyOnlyRows.count, 1, "Expected one weekly-only row: \(rows)")
+        if let weeklyOnlyRow = weeklyOnlyRows.first {
+            XCTAssertFalse(weeklyOnlyRow.contains("2%"), "Weekly-only row fabricated MCP usage: \(weeklyOnlyRows)")
+        }
+    }
+
     /// A details payload carrying only weekly fields must count as non-empty so
     /// the detail submenu is not hidden.
     func testHasAnyValueIncludesWeeklyFields() {
@@ -318,40 +365,5 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertFalse(DetailedUsage().hasAnyValue)
     }
 
-    // MARK: - Top-level quota row windows
-
-    /// The Z.AI top-level quota row must include the Lite weekly window
-    /// alongside token (5h session) and MCP, in window-length order.
-    @MainActor
-    func testZaiTopLevelPercentsIncludeWeekly() {
-        let details = DetailedUsage(
-            tokenUsagePercent: 12,
-            mcpUsagePercent: 2,
-            weeklyUsagePercent: 1
-        )
-        XCTAssertEqual(
-            StatusBarController.zaiCodingPlanTopLevelPercents(details: details),
-            [12, 1, 2]
-        )
-    }
-
-    /// A plan with only the weekly window must still render it on the row.
-    @MainActor
-    func testZaiTopLevelPercentsWeeklyOnly() {
-        let details = DetailedUsage(weeklyUsagePercent: 1)
-        XCTAssertEqual(
-            StatusBarController.zaiCodingPlanTopLevelPercents(details: details),
-            [1]
-        )
-    }
-
-    /// No populated window -> empty array (caller falls back to overall %).
-    @MainActor
-    func testZaiTopLevelPercentsEmptyWithoutWindows() {
-        XCTAssertEqual(
-            StatusBarController.zaiCodingPlanTopLevelPercents(details: nil),
-            []
-        )
-    }
 
 }

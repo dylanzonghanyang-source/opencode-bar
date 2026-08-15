@@ -964,7 +964,7 @@ final class StatusBarController: NSObject {
     /// row shows every active window side by side, so the Lite weekly window
     /// must be included here too — omitting it makes the row diverge from the
     /// usage windows (5h session, weekly, MCP monthly).
-    static func zaiCodingPlanTopLevelPercents(details: DetailedUsage?) -> [Double] {
+    private static func zaiCodingPlanTopLevelPercents(details: DetailedUsage?) -> [Double] {
         [
             details?.tokenUsagePercent,
             details?.weeklyUsagePercent,
@@ -4263,22 +4263,33 @@ extension StatusBarController {
                 )
             ),
             .zaiCodingPlan: ProviderResult(
-                usage: .quotaBased(remaining: 1, entitlement: 100, overagePermitted: false),
+                usage: .quotaBased(remaining: 88, entitlement: 100, overagePermitted: false),
                 details: DetailedUsage(
-                    tokenUsagePercent: 99.0,
+                    tokenUsagePercent: 12.0,
+                    weeklyUsagePercent: 1.0,
+                    mcpUsagePercent: 2.0,
                     tokenUsageReset: oneDayFromNow,
-                    tokenUsageUsed: 990_000,
-                    tokenUsageTotal: 1_000_000,
-                    mcpUsagePercent: 45.0,
-                    mcpUsageReset: oneDayFromNow,
-                    mcpUsageUsed: 45,
-                    mcpUsageTotal: 100,
-                    modelUsageTokens: 500_000,
-                    modelUsageCalls: 128,
-                    toolNetworkSearchCount: 42,
-                    toolWebReadCount: 15,
-                    toolZreadCount: 8
-                )
+                    weeklyUsageReset: sevenDaysFromNow,
+                    mcpUsageReset: oneDayFromNow
+                ),
+                accounts: [
+                    ProviderAccountResult(
+                        accountIndex: 0,
+                        accountId: "zai-session",
+                        usage: .quotaBased(remaining: 88, entitlement: 100, overagePermitted: false),
+                        details: DetailedUsage(
+                            tokenUsagePercent: 12.0,
+                            weeklyUsagePercent: 1.0,
+                            mcpUsagePercent: 2.0
+                        )
+                    ),
+                    ProviderAccountResult(
+                        accountIndex: 1,
+                        accountId: "zai-weekly",
+                        usage: .quotaBased(remaining: 99, entitlement: 100, overagePermitted: false),
+                        details: DetailedUsage(weeklyUsagePercent: 1.0)
+                    )
+                ]
             ),
             .geminiCLI: ProviderResult(
                 usage: .quotaBased(remaining: 85, entitlement: 100, overagePermitted: false),
