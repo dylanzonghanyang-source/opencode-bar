@@ -17,9 +17,13 @@ struct ZaiQuotaLimitItem: Decodable {
     let currentValue: Int?
     let total: Int?
     let nextResetTime: Int64?
-    /// CREDIT_LIMIT items (lite tier) report capacity as `usage` and leftover as `remaining`
-    /// instead of `total`/`currentValue` — keep `usage` so credit-based plans can render.
+    /// CREDIT_LIMIT items (lite tier) report capacity as `usage` when `total`
+    /// is absent. `currentValue` remains the consumed amount, while
+    /// `remaining` is server-reported leftover metadata.
     let usage: Int?
+    /// Optional duration metadata for identifying known CREDIT_LIMIT windows.
+    let number: Int?
+    let remaining: Int?
     /// Window unit used to distinguish the plan's rolling windows:
     /// unit=3 (hours) -> 5-hour session quota, unit=6 (weeks) -> 7-day weekly quota.
     /// See docs.z.ai FAQ and third-party parsers (ClaudeBar ZaiUsageProbe, token-monitor).
@@ -47,6 +51,8 @@ struct ZaiQuotaLimitItem: Decodable {
         case nextResetTime
         case usage
         case unit
+        case number
+        case remaining
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +64,8 @@ struct ZaiQuotaLimitItem: Decodable {
         nextResetTime = Self.decodeInt64(container, forKey: .nextResetTime)
         usage = Self.decodeInt(container, forKey: .usage)
         unit = Self.decodeInt(container, forKey: .unit)
+        number = Self.decodeInt(container, forKey: .number)
+        remaining = Self.decodeInt(container, forKey: .remaining)
     }
 
     private static func decodeDouble(_ container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> Double? {
@@ -206,16 +214,21 @@ final class ZaiCodingPlanProvider: ProviderProtocol {
         let tokenLimit = limits.first { $0.type.uppercased() == "TOKENS_LIMIT" }
         let mcpLimit = limits.first { $0.type.uppercased() == "TIME_LIMIT" }
 
-        // New schema (lite tier): only CREDIT_LIMIT items are returned, and the
-        // plan's two rolling windows are distinguished by `unit`:
-        //   unit=3 (hours) -> 5-hour session quota
-        //   unit=6 (weeks) -> 7-day weekly quota
-        // (verified against docs.z.ai FAQ + subscription page + third-party
-        // parsers). Keep BOTH windows; the weekly cap is the one users care about.
+        // New schema (lite tier): only CREDIT_LIMIT items are returned. `usage`
+        // supplies capacity when `total` is absent, `currentValue` remains the
+        // consumed amount, and `remaining` is server-reported leftover metadata.
+        // The two known rolling windows are identified by unit plus optional
+        // duration metadata: unit=3/number=5 is the 5-hour session quota, and
+        // unit=6/number=1 is the 7-day weekly quota. Missing number preserves
+        // compatibility with older responses; contradictory values are ignored.
         let creditLimits = limits.filter { $0.type.uppercased() == "CREDIT_LIMIT" }
         let isCreditOnlySchema = tokenLimit == nil && mcpLimit == nil
-        let creditSessionLimit = isCreditOnlySchema ? creditLimits.first { $0.unit == 3 } : nil
-        let creditWeeklyLimit = isCreditOnlySchema ? creditLimits.first { $0.unit == 6 } : nil
+        let creditSessionLimit = isCreditOnlySchema
+            ? creditLimits.first { $0.unit == 3 && ($0.number == nil || $0.number == 5) }
+            : nil
+        let creditWeeklyLimit = isCreditOnlySchema
+            ? creditLimits.first { $0.unit == 6 && ($0.number == nil || $0.number == 1) }
+            : nil
 
         let tokenUsagePercent = tokenLimit?.percentage ?? tokenLimit?.computedPercentage
             ?? creditSessionLimit?.percentage ?? creditSessionLimit?.computedPercentage

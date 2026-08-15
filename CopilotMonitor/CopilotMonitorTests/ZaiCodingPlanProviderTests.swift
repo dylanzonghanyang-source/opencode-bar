@@ -163,6 +163,8 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertEqual(details.weeklyUsageUsed, 27)
         XCTAssertEqual(details.weeklyUsageTotal, 10000)
         XCTAssertNotNil(details.weeklyUsageReset)
+        // The observed fixture has 27 + 1972 = 1999 while usage is 2000;
+        // successful fetch proves no exact remaining arithmetic is required.
 
         // No MCP window in this schema
         XCTAssertNil(details.mcpUsagePercent)
@@ -188,6 +190,76 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertNil(details.tokenUsageUsed)
         XCTAssertEqual(details.weeklyUsageTotal, 10000)
         XCTAssertEqual(details.weeklyUsageUsed, 27)
+    }
+
+    func testCreditLimitUnitThreeWithFutureDurationIsNotMappedAsFiveHour() async throws {
+        let futureHourWindow = """
+        {"data": {"limits": [
+          {"type": "CREDIT_LIMIT", "unit": 3, "number": 10, "usage": 4000,
+           "currentValue": 40, "remaining": 3960, "percentage": 1},
+          {"type": "CREDIT_LIMIT", "unit": 6, "number": 1, "usage": 10000,
+           "currentValue": 27, "remaining": 9972, "percentage": 1}
+        ]}}
+        """
+        let result = try await makeProvider(quotaJSON: futureHourWindow).fetch()
+        let details = try XCTUnwrap(result.details)
+
+        XCTAssertNil(details.tokenUsagePercent)
+        XCTAssertNil(details.tokenUsageUsed)
+        XCTAssertNil(details.tokenUsageTotal)
+        XCTAssertEqual(details.weeklyUsagePercent, 1)
+        XCTAssertEqual(details.weeklyUsageTotal, 10000)
+    }
+
+    func testCreditLimitUnitSixWithFutureDurationIsNotMappedAsWeekly() async throws {
+        let futureWeeklyWindow = """
+        {"data": {"limits": [
+          {"type": "CREDIT_LIMIT", "unit": 3, "number": 5, "usage": 2000,
+           "currentValue": 27, "remaining": 1972, "percentage": 1},
+          {"type": "CREDIT_LIMIT", "unit": 6, "number": 2, "usage": 20000,
+           "currentValue": 100, "remaining": 19900, "percentage": 1}
+        ]}}
+        """
+        let result = try await makeProvider(quotaJSON: futureWeeklyWindow).fetch()
+        let details = try XCTUnwrap(result.details)
+
+        XCTAssertEqual(details.tokenUsagePercent, 1)
+        XCTAssertEqual(details.tokenUsageTotal, 2000)
+        XCTAssertNil(details.weeklyUsagePercent)
+        XCTAssertNil(details.weeklyUsageUsed)
+        XCTAssertNil(details.weeklyUsageTotal)
+    }
+
+    func testCreditLimitUnitThreeWithoutNumberUsesCompatibilityFallback() async throws {
+        let legacySessionWindow = """
+        {"data": {"limits": [
+          {"type": "CREDIT_LIMIT", "unit": 3, "usage": 2000,
+           "currentValue": 27, "percentage": 1}
+        ]}}
+        """
+        let result = try await makeProvider(quotaJSON: legacySessionWindow).fetch()
+        let details = try XCTUnwrap(result.details)
+
+        XCTAssertEqual(details.tokenUsagePercent, 1)
+        XCTAssertEqual(details.tokenUsageUsed, 27)
+        XCTAssertEqual(details.tokenUsageTotal, 2000)
+        XCTAssertNil(details.weeklyUsagePercent)
+    }
+
+    func testCreditLimitUnitSixWithoutNumberUsesCompatibilityFallback() async throws {
+        let legacyWeeklyWindow = """
+        {"data": {"limits": [
+          {"type": "CREDIT_LIMIT", "unit": 6, "usage": 10000,
+           "currentValue": 27, "percentage": 1}
+        ]}}
+        """
+        let result = try await makeProvider(quotaJSON: legacyWeeklyWindow).fetch()
+        let details = try XCTUnwrap(result.details)
+
+        XCTAssertNil(details.tokenUsagePercent)
+        XCTAssertEqual(details.weeklyUsagePercent, 1)
+        XCTAssertEqual(details.weeklyUsageUsed, 27)
+        XCTAssertEqual(details.weeklyUsageTotal, 10000)
     }
 
     // MARK: - Standard schema (unchanged behavior)
@@ -250,15 +322,19 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         let session = limits[0]
         XCTAssertEqual(session.type, "CREDIT_LIMIT")
         XCTAssertEqual(session.unit, 3)
+        XCTAssertEqual(session.number, 5)
         XCTAssertEqual(session.usage, 2000)
         XCTAssertEqual(session.currentValue, 27)
+        XCTAssertEqual(session.remaining, 1972)
         XCTAssertEqual(session.percentage, 1)
         XCTAssertNotNil(session.nextResetTime)
         XCTAssertNil(session.total)
 
         let weekly = limits[1]
         XCTAssertEqual(weekly.unit, 6)
+        XCTAssertEqual(weekly.number, 1)
         XCTAssertEqual(weekly.usage, 10000)
+        XCTAssertEqual(weekly.remaining, 9972)
     }
 
     func testCreditLimitResolvedTotalFallsBackToUsage() throws {
