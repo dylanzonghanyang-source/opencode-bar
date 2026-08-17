@@ -153,6 +153,44 @@ enum MenuQuotaWindowBuilder {
     }
 }
 
+enum MainMenuProviderPresentation {
+    static let payAsYouGoOrder: [ProviderIdentifier] = [
+        .deepSeek,
+        .dashScope,
+        .timicc,
+        .openRouter
+    ]
+
+    static func shouldHideErrorOnlyProvider(
+        identifier: ProviderIdentifier,
+        result: ProviderResult?,
+        errorMessage: String?,
+        isLoading: Bool
+    ) -> Bool {
+        guard errorMessage != nil, !isLoading else { return false }
+        return !hasValidMetric(for: identifier, result: result)
+    }
+
+    static func hasValidMetric(
+        for identifier: ProviderIdentifier,
+        result: ProviderResult?
+    ) -> Bool {
+        guard let result else { return false }
+
+        if identifier == .geminiCLI {
+            return result.details?.geminiAccounts?.contains { $0.remainingPercentage.isFinite } ?? false
+        }
+
+        switch result.usage {
+        case .payAsYouGo(_, let cost, _):
+            return [result.details?.creditsBalance, result.details?.creditsRemaining, cost]
+                .contains { $0?.isFinite == true }
+        case .quotaBased:
+            return result.usage.usagePercentage.isFinite
+        }
+    }
+}
+
 enum MenuSettingsLayout {
     static let lowFrequencyTitles = [
         "Check for Updates...",
@@ -1992,8 +2030,23 @@ final class StatusBarController: NSObject {
 
             let result = providerResults[identifier]
             let errorMessage = lastProviderErrors[identifier]
+            let hasValidMetric = MainMenuProviderPresentation.hasValidMetric(
+                for: identifier,
+                result: result
+            )
+
+            if MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: identifier,
+                result: result,
+                errorMessage: errorMessage,
+                isLoading: loadingProviders.contains(identifier)
+            ) {
+                debugLog("updateMultiProviderMenu: hiding \(identifier.displayName) error-only quota row")
+                continue
+            }
 
             if let errorMessage,
+               !hasValidMetric,
                shouldDisplayErrorStateEvenWithResult(errorMessage, identifier: identifier, result: result) {
                 hasQuota = true
                 let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
@@ -2164,9 +2217,21 @@ final class StatusBarController: NSObject {
         if isProviderEnabled(.geminiCLI) {
             let geminiResult = providerResults[.geminiCLI]
             let geminiError = lastProviderErrors[.geminiCLI]
+            let geminiHasValidMetric = MainMenuProviderPresentation.hasValidMetric(
+                for: .geminiCLI,
+                result: geminiResult
+            )
 
-            if let geminiError,
-               shouldDisplayErrorStateEvenWithResult(geminiError, identifier: .geminiCLI, result: geminiResult) {
+            if MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: .geminiCLI,
+                result: geminiResult,
+                errorMessage: geminiError,
+                isLoading: loadingProviders.contains(.geminiCLI)
+            ) {
+                debugLog("updateMultiProviderMenu: hiding Gemini CLI error-only quota row")
+            } else if let geminiError,
+                      !geminiHasValidMetric,
+                      shouldDisplayErrorStateEvenWithResult(geminiError, identifier: .geminiCLI, result: geminiResult) {
                 hasQuota = true
                 let item = createErrorMenuItem(identifier: .geminiCLI, errorMessage: geminiError)
                 if item.isEnabled {
@@ -2294,14 +2359,30 @@ final class StatusBarController: NSObject {
 
         var hasPayAsYouGo = false
 
-        let payAsYouGoOrder: [ProviderIdentifier] = [.deepSeek, .dashScope, .timicc, .openRouter, .openCodeZen]
+        let payAsYouGoOrder = MainMenuProviderPresentation.payAsYouGoOrder
         for identifier in payAsYouGoOrder {
             guard isProviderEnabled(identifier) else { continue }
 
             let result = providerResults[identifier]
             let errorMessage = lastProviderErrors[identifier]
+            let hasValidMetric = MainMenuProviderPresentation.hasValidMetric(
+                for: identifier,
+                result: result
+            )
 
-            if let errorMessage, shouldDisplayErrorStateEvenWithResult(errorMessage) {
+            if MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: identifier,
+                result: result,
+                errorMessage: errorMessage,
+                isLoading: loadingProviders.contains(identifier)
+            ) {
+                debugLog("updateMultiProviderMenu: hiding \(identifier.displayName) error-only pay-as-you-go row")
+                continue
+            }
+
+            if let errorMessage,
+               !hasValidMetric,
+               shouldDisplayErrorStateEvenWithResult(errorMessage) {
                 hasPayAsYouGo = true
                 let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
                 if item.isEnabled {

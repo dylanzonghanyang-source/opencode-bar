@@ -726,4 +726,59 @@ final class CLIFormatterTests: XCTestCase {
         XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Install CLI (opencodebar)"))
         XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Share Usage Snapshot..."))
     }
+
+    func testMainPayAsYouGoOrderExcludesOpenCodeZen() {
+        XCTAssertFalse(MainMenuProviderPresentation.payAsYouGoOrder.contains(.openCodeZen))
+        XCTAssertEqual(
+            MainMenuProviderPresentation.payAsYouGoOrder,
+            [.deepSeek, .dashScope, .timicc, .openRouter]
+        )
+    }
+
+    func testMainMenuHidesErrorOnlyProviderButKeepsLoadingState() {
+        XCTAssertTrue(
+            MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: .antigravity,
+                result: nil,
+                errorMessage: "Provider failed",
+                isLoading: false
+            )
+        )
+        XCTAssertFalse(
+            MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: .antigravity,
+                result: nil,
+                errorMessage: "Provider failed",
+                isLoading: true
+            )
+        )
+    }
+
+    func testMainMenuKeepsProvidersWithValidMetrics() {
+        let quotaResult = ProviderResult(
+            usage: .quotaBased(remaining: 50, entitlement: 100, overagePermitted: false),
+            details: nil
+        )
+        let payAsYouGoResult = ProviderResult(
+            usage: .payAsYouGo(utilization: 0, cost: 0, resetsAt: nil),
+            details: nil
+        )
+
+        XCTAssertFalse(
+            MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: .antigravity,
+                result: quotaResult,
+                errorMessage: "Temporary provider error",
+                isLoading: false
+            )
+        )
+        XCTAssertFalse(
+            MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                identifier: .openRouter,
+                result: payAsYouGoResult,
+                errorMessage: "Temporary provider error",
+                isLoading: false
+            )
+        )
+    }
 }
