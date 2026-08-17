@@ -2231,7 +2231,7 @@ final class StatusBarController: NSObject {
 
         var hasPayAsYouGo = false
 
-        let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek]
+        let payAsYouGoOrder: [ProviderIdentifier] = [.deepSeek, .dashScope, .openRouter, .openCodeZen]
         for identifier in payAsYouGoOrder {
             guard isProviderEnabled(identifier) else { continue }
 

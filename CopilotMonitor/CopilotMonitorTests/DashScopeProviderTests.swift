@@ -157,7 +157,7 @@ final class DashScopeProviderTests: XCTestCase {
         let provider = makeProvider(userInfoBody: userInfoBody, balanceBody: balanceBody)
         let result = try await provider.fetch()
         let details = try XCTUnwrap(result.details)
-        let rows = StatusBarController.dashScopeBalanceRows(details: details)
+        let rows = ProviderMenuBuilder.dashScopeBalanceRows(details: details)
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].label, "Account Balance")
         XCTAssertEqual(rows[0].value, 50.00, accuracy: 0.001)
