@@ -591,4 +591,126 @@ final class CLIFormatterTests: XCTestCase {
         )
         XCTAssertEqual(text, "$0.00")
     }
+
+    // MARK: - Phase 1 menu quota-window hierarchy
+
+    func testOpenCodeGoWindowsAreExplicitAndOrdered() {
+        let details = DetailedUsage(
+            fiveHourUsage: 13,
+            sevenDayUsage: 22,
+            openCodeGoMonthlyUsage: 34
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .openCodeGo,
+            primaryUsage: 13,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["5h", "Weekly", "Monthly"])
+        XCTAssertEqual(windows.map(\.usedPercent), [13, 22, 34])
+    }
+
+    func testZAIWindowsAreExplicitAndOrdered() {
+        let details = DetailedUsage(
+            tokenUsagePercent: 1,
+            weeklyUsagePercent: 2,
+            mcpUsagePercent: 99
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .zaiCodingPlan,
+            primaryUsage: 1,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["5h", "Weekly"])
+        XCTAssertEqual(windows.map(\.usedPercent), [1, 2])
+    }
+
+    func testCodexUsesPrimaryAndSecondaryButExcludesSpark() {
+        let details = DetailedUsage(
+            secondaryUsage: 25,
+            codexPrimaryWindowLabel: "Primary API",
+            codexPrimaryWindowHours: 5,
+            codexSecondaryWindowLabel: "7d",
+            codexSecondaryWindowHours: 168,
+            sparkUsage: 40,
+            sparkSecondaryUsage: 50
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .codex,
+            primaryUsage: 10,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["Primary API", "7d"])
+        XCTAssertEqual(windows.map(\.usedPercent), [10, 25])
+    }
+
+    func testCodexPrimaryOnlyDoesNotFabricateWeekly() {
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .codex,
+            primaryUsage: 10,
+            details: DetailedUsage(sparkUsage: 40, sparkSecondaryUsage: 50)
+        )
+
+        XCTAssertEqual(windows.count, 1)
+        XCTAssertEqual(windows.first?.label, "5h")
+        XCTAssertEqual(windows.first?.usedPercent, 10)
+    }
+
+    func testCodexDurationMetadataLabelsWindowBeforeRoleFallback() {
+        let details = DetailedUsage(
+            secondaryUsage: 25,
+            codexPrimaryWindowHours: 2,
+            codexSecondaryWindowHours: 24 * 28
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .codex,
+            primaryUsage: 10,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["2h", "Monthly"])
+    }
+
+    func testQuotaWindowRemainingDisplayUsesUsedSemantics() {
+        XCTAssertEqual(MenuQuotaWindowBuilder.remainingPercent(fromUsedPercent: 0), 100)
+        XCTAssertEqual(MenuQuotaWindowBuilder.remainingPercent(fromUsedPercent: 25), 75)
+        XCTAssertEqual(MenuQuotaWindowBuilder.remainingPercent(fromUsedPercent: 100), 0)
+    }
+
+    func testQuotaWindowRemainingTextHasOnePercentSuffix() {
+        let window = MenuQuotaWindow(label: "5h", usedPercent: 25)
+        XCTAssertEqual(MenuQuotaWindowBuilder.remainingText(for: window), "5h: 75% left")
+    }
+
+    func testSettingsLayoutKeepsLowFrequencyControlsOutOfTopLevel() {
+        let lowFrequencyControls = Set([
+            "Check for Updates...",
+            "Auto Refresh",
+            "Status Bar Options",
+            "Launch at Login",
+            "Install CLI (opencodebar)",
+            "Share Usage Snapshot...",
+            "OpenCode Bar"
+        ])
+
+        XCTAssertEqual(
+            Set(MenuSettingsLayout.lowFrequencyTitles),
+            lowFrequencyControls
+        )
+        XCTAssertTrue(MenuSettingsLayout.topLevelTitles.contains("Refresh"))
+        XCTAssertTrue(MenuSettingsLayout.topLevelTitles.contains("Settings"))
+        XCTAssertTrue(MenuSettingsLayout.topLevelTitles.contains("Quit"))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Check for Updates..."))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Auto Refresh"))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Status Bar Options"))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Launch at Login"))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Install CLI (opencodebar)"))
+        XCTAssertFalse(MenuSettingsLayout.topLevelTitles.contains("Share Usage Snapshot..."))
+    }
 }

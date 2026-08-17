@@ -24,6 +24,109 @@ struct UsagePercentCandidate {
     let priority: UsageDisplayWindowPriority
 }
 
+struct MenuQuotaWindow: Equatable {
+    let label: String
+    let usedPercent: Double
+}
+
+/// Builds the compact, labeled quota windows shown below multi-window providers.
+/// Provider values remain USED percentages; conversion to REMAINING is display-only.
+enum MenuQuotaWindowBuilder {
+    static func windows(
+        for identifier: ProviderIdentifier,
+        primaryUsage: Double?,
+        details: DetailedUsage?
+    ) -> [MenuQuotaWindow] {
+        let windows: [MenuQuotaWindow]
+        switch identifier {
+        case .openCodeGo:
+            windows = compactWindows([
+                window("5h", details?.fiveHourUsage),
+                window("Weekly", details?.sevenDayUsage),
+                window("Monthly", details?.openCodeGoMonthlyUsage)
+            ])
+        case .zaiCodingPlan:
+            windows = compactWindows([
+                window("5h", details?.tokenUsagePercent),
+                window("Weekly", details?.weeklyUsagePercent)
+            ])
+        case .codex:
+            let primary = primaryUsage ?? details?.dailyUsage
+            windows = compactWindows([
+                window(
+                    label(metadata: details?.codexPrimaryWindowLabel, hours: details?.codexPrimaryWindowHours, fallback: "5h"),
+                    primary
+                ),
+                window(
+                    label(metadata: details?.codexSecondaryWindowLabel, hours: details?.codexSecondaryWindowHours, fallback: "Weekly"),
+                    details?.secondaryUsage
+                )
+            ])
+        case .claude, .kimi, .minimaxCodingPlan:
+            windows = compactWindows([
+                window("5h", details?.fiveHourUsage),
+                window("Weekly", details?.sevenDayUsage)
+            ])
+        case .cursor:
+            windows = compactWindows([
+                window("Auto", details?.cursorAutoUsage),
+                window("API", details?.cursorApiUsage)
+            ])
+        default:
+            windows = []
+        }
+
+        if !windows.isEmpty {
+            return windows
+        }
+        guard let primaryUsage, primaryUsage.isFinite else { return [] }
+        return [MenuQuotaWindow(label: "Usage", usedPercent: primaryUsage)]
+    }
+
+    static func remainingPercent(fromUsedPercent usedPercent: Double) -> Double {
+        min(max(100 - usedPercent, 0), 100)
+    }
+
+    static func remainingText(for window: MenuQuotaWindow) -> String {
+        let remaining = remainingPercent(fromUsedPercent: window.usedPercent)
+        return "\(window.label): \(UsagePercentDisplayFormatter.string(from: remaining)) left"
+    }
+
+    private static func window(_ label: String, _ usedPercent: Double?) -> MenuQuotaWindow? {
+        guard let usedPercent, usedPercent.isFinite else { return nil }
+        return MenuQuotaWindow(label: label, usedPercent: usedPercent)
+    }
+
+    private static func compactWindows(_ windows: [MenuQuotaWindow?]) -> [MenuQuotaWindow] {
+        windows.compactMap { $0 }
+    }
+
+    private static func label(metadata: String?, hours: Int?, fallback: String) -> String {
+        if let metadata = metadata?.trimmingCharacters(in: .whitespacesAndNewlines), !metadata.isEmpty {
+            return metadata
+        }
+        guard let hours, hours > 0 else { return fallback }
+        if hours >= 24 * 28 { return "Monthly" }
+        if hours >= 24 * 7 { return "Weekly" }
+        if hours >= 24 { return "Daily" }
+        return "\(hours)h"
+    }
+}
+
+enum MenuSettingsLayout {
+    static let lowFrequencyTitles = [
+        "Check for Updates...",
+        "Auto Refresh",
+        "Status Bar Options",
+        "Launch at Login",
+        "Install CLI (opencodebar)",
+        "Share Usage Snapshot...",
+        "OpenCode Bar"
+    ]
+
+    static let topLevelTitles = ["Refresh", "Settings", "View Error Details...", "Quit"]
+}
+
 extension StatusBarController: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         guard menu === self.menu else { return }
@@ -118,6 +221,7 @@ final class StatusBarController: NSObject {
     private var enabledProvidersMenu: NSMenu!
     private var lastProviderErrors: [ProviderIdentifier: String] = [:]
     private var viewErrorDetailsItem: NSMenuItem!
+    private var dynamicMenuAnchor: NSMenuItem!
     private var orphanedSubscriptionKeys: [String] = []
     private var orphanedSubscriptionTotal: Double = 0
     private let criticalUsageThreshold: Double = 90.0
@@ -397,15 +501,24 @@ final class StatusBarController: NSObject {
         // Load cached history immediately on startup (before API fetch completes)
         loadCachedHistoryOnStartup()
 
+        dynamicMenuAnchor = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        dynamicMenuAnchor.isHidden = true
+        menu.addItem(dynamicMenuAnchor)
+
         let refreshItem = NSMenuItem(title: "Refresh", action: #selector(refreshClicked), keyEquivalent: "r")
         refreshItem.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
         refreshItem.target = self
         menu.addItem(refreshItem)
 
+        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        let settingsMenu = NSMenu()
+        settingsItem.submenu = settingsMenu
+
         let checkForUpdatesItem = NSMenuItem(title: "Check for Updates...", action: #selector(AppDelegate.checkForUpdates), keyEquivalent: "u")
         checkForUpdatesItem.image = NSImage(systemSymbolName: "arrow.down.circle", accessibilityDescription: "Check for Updates")
         checkForUpdatesItem.target = NSApp.delegate
-        menu.addItem(checkForUpdatesItem)
+        settingsMenu.addItem(checkForUpdatesItem)
 
         let refreshIntervalItem = NSMenuItem(title: "Auto Refresh", action: nil, keyEquivalent: "")
         refreshIntervalItem.image = NSImage(systemSymbolName: "timer", accessibilityDescription: "Auto Refresh")
@@ -417,7 +530,7 @@ final class StatusBarController: NSObject {
             refreshIntervalMenu.addItem(item)
         }
         refreshIntervalItem.submenu = refreshIntervalMenu
-        menu.addItem(refreshIntervalItem)
+        settingsMenu.addItem(refreshIntervalItem)
         updateRefreshIntervalMenu()
 
         let statusBarOptionsItem = NSMenuItem(title: "Status Bar Options", action: nil, keyEquivalent: "")
@@ -481,7 +594,7 @@ final class StatusBarController: NSObject {
         statusBarOptionsMenu.addItem(showProviderNameMenuItem)
 
         statusBarOptionsItem.submenu = statusBarOptionsMenu
-        menu.addItem(statusBarOptionsItem)
+        settingsMenu.addItem(statusBarOptionsItem)
         updateStatusBarDisplayMenuState()
 
         predictionPeriodMenu = NSMenu()
@@ -493,46 +606,43 @@ final class StatusBarController: NSObject {
         }
         updatePredictionPeriodMenu()
 
-        menu.addItem(NSMenuItem.separator())
-
         launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(launchAtLoginClicked), keyEquivalent: "")
         launchAtLoginItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: "Launch at Login")
         launchAtLoginItem.target = self
         updateLaunchAtLoginState()
-        menu.addItem(launchAtLoginItem)
+        settingsMenu.addItem(launchAtLoginItem)
 
         installCLIItem = NSMenuItem(title: "Install CLI (opencodebar)", action: #selector(installCLIClicked), keyEquivalent: "")
         installCLIItem.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: "Install CLI")
         installCLIItem.target = self
-        menu.addItem(installCLIItem)
+        settingsMenu.addItem(installCLIItem)
         updateCLIInstallState()
 
         let shareSnapshotItem = NSMenuItem(title: "Share Usage Snapshot...", action: #selector(shareUsageSnapshotClicked), keyEquivalent: "")
         shareSnapshotItem.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share Usage Snapshot")
         shareSnapshotItem.target = self
-        menu.addItem(shareSnapshotItem)
-        debugLog("setupMenu: Share Usage Snapshot menu item added")
+        settingsMenu.addItem(shareSnapshotItem)
+        debugLog("setupMenu: Share Usage Snapshot menu item added to Settings")
 
-        menu.addItem(NSMenuItem.separator())
+        settingsMenu.addItem(NSMenuItem.separator())
 
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
-        let versionItem = NSMenuItem(title: "OpenCode Bar v\(version)", action: #selector(openGitHub), keyEquivalent: "")
+        let versionItem = NSMenuItem(title: "\(MenuSettingsLayout.lowFrequencyTitles.last ?? "OpenCode Bar") v\(version)", action: #selector(openGitHub), keyEquivalent: "")
         versionItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Version")
         versionItem.target = self
-        menu.addItem(versionItem)
+        settingsMenu.addItem(versionItem)
+        menu.addItem(settingsItem)
 
-         let quitItem = NSMenuItem(title: "Quit", action: #selector(quitClicked), keyEquivalent: "q")
-         quitItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Quit")
-         quitItem.target = self
-         menu.addItem(quitItem)
-         
-         menu.addItem(NSMenuItem.separator())
-         
-         viewErrorDetailsItem = NSMenuItem(title: "View Error Details...", action: #selector(viewErrorDetailsClicked), keyEquivalent: "e")
-         viewErrorDetailsItem.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "View Error Details")
-         viewErrorDetailsItem.target = self
-         viewErrorDetailsItem.isHidden = true
-         menu.addItem(viewErrorDetailsItem)
+        viewErrorDetailsItem = NSMenuItem(title: "View Error Details...", action: #selector(viewErrorDetailsClicked), keyEquivalent: "e")
+        viewErrorDetailsItem.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: "View Error Details")
+        viewErrorDetailsItem.target = self
+        viewErrorDetailsItem.isHidden = true
+        menu.addItem(viewErrorDetailsItem)
+
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitClicked), keyEquivalent: "q")
+        quitItem.image = NSImage(systemSymbolName: "xmark.circle", accessibilityDescription: "Quit")
+        quitItem.target = self
+        menu.addItem(quitItem)
          
          statusItem?.menu = menu
          logMenuStructure()
@@ -957,19 +1067,6 @@ final class StatusBarController: NSObject {
         }
 
         return details.chutesMonthlyValueUsedPercent
-    }
-
-    /// Window percentages shown on the Z.AI top-level quota/provider row.
-    /// Unlike the status-bar candidate list (priority-ordered), the top-level
-    /// row shows every active window side by side, so the Lite weekly window
-    /// must be included here too — omitting it makes the row diverge from the
-    /// usage windows (5h session, weekly, MCP monthly).
-    private static func zaiCodingPlanTopLevelPercents(details: DetailedUsage?) -> [Double] {
-        [
-            details?.tokenUsagePercent,
-            details?.weeklyUsagePercent,
-            details?.mcpUsagePercent
-        ].compactMap { $0 }
     }
 
     static func usagePercentCandidates(
@@ -1622,11 +1719,11 @@ final class StatusBarController: NSObject {
           }
           hasDeferredMenuRebuild = false
 
-          guard let separatorIndex = menu.items.firstIndex(where: { $0.isSeparatorItem }) else {
-              debugLog("updateMultiProviderMenu: no separator found, returning")
+          guard let separatorIndex = menu.items.firstIndex(where: { $0 === dynamicMenuAnchor }) else {
+              debugLog("updateMultiProviderMenu: dynamic anchor not found, returning")
               return
           }
-          debugLog("updateMultiProviderMenu: separatorIndex=\(separatorIndex)")
+          debugLog("updateMultiProviderMenu: dynamic anchor index=\(separatorIndex)")
 
           var itemsToRemove: [NSMenuItem] = []
           let startIndex = separatorIndex + 1
@@ -1657,11 +1754,6 @@ final class StatusBarController: NSObject {
           }
 
         var insertIndex = separatorIndex + 1
-
-         let separator1 = NSMenuItem.separator()
-         separator1.tag = 999
-         menu.insertItem(separator1, at: insertIndex)
-         insertIndex += 1
 
          // QUOTA section comes first in the main menu information architecture.
          let quotaHeader = NSMenuItem()
@@ -1951,169 +2043,30 @@ final class StatusBarController: NSObject {
                             displayName += " (\(unavailableLabel))"
                         }
                         let isUnavailableRateLimited = unavailableLabel == "Rate limited"
-
-                        // Keep menu list rows in multi-window format (e.g., 5h, weekly, monthly together).
-                        let usedPercents: [Double]
-                        if identifier == .claude,
-                           let details = account.details,
-                           let fiveHour = details.fiveHourUsage,
-                           let sevenDay = details.sevenDayUsage {
-                            var percents: [Double] = [fiveHour, sevenDay]
-                            if let sonnetUsage = details.sonnetUsage {
-                                percents.append(sonnetUsage)
-                            }
-                            if let fableUsage = details.fableUsage {
-                                percents.append(fableUsage)
-                            }
-                            usedPercents = percents
-                        } else if identifier == .minimaxCodingPlan,
-                                  let fiveHour = account.details?.fiveHourUsage,
-                                  let sevenDay = account.details?.sevenDayUsage {
-                            usedPercents = [fiveHour, sevenDay]
-                        } else if identifier == .openCodeGo {
-                            let percents = [
-                                account.details?.fiveHourUsage,
-                                account.details?.sevenDayUsage,
-                                account.details?.openCodeGoMonthlyUsage
-                            ].compactMap { $0 }
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else if identifier == .grok {
-                            let percents = [account.details?.monthlyUsage].compactMap { $0 }
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else if identifier == .kimi,
-                                  let fiveHour = account.details?.fiveHourUsage,
-                                  let sevenDay = account.details?.sevenDayUsage {
-                            usedPercents = [fiveHour, sevenDay]
-                        } else if identifier == .codex {
-                            var percents = [account.usage.usagePercentage]
-                            if let secondary = account.details?.secondaryUsage {
-                                percents.append(secondary)
-                            }
-                            if let sparkPrimary = account.details?.sparkUsage {
-                                percents.append(sparkPrimary)
-                            }
-                            if let sparkSecondary = account.details?.sparkSecondaryUsage {
-                                percents.append(sparkSecondary)
-                            }
-                            usedPercents = percents
-                        } else if identifier == .cursor {
-                            let percents = [
-                                account.details?.cursorAutoUsage,
-                                account.details?.cursorApiUsage
-                            ].compactMap { $0 }
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else if identifier == .zaiCodingPlan {
-                            let percents = Self.zaiCodingPlanTopLevelPercents(details: account.details)
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else if identifier == .chutes {
-                            let percents = [Self.dailyPercentFromDetails(account.details), Self.chutesMonthlyPercentFromDetails(account.details)].compactMap { $0 }
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else if identifier == .nanoGpt {
-                            let percents = [
-                                account.details?.sevenDayUsage,
-                                account.details?.tokenUsagePercent,
-                                account.details?.mcpUsagePercent
-                            ].compactMap { $0 }
-                            usedPercents = percents.isEmpty ? [account.usage.usagePercentage] : percents
-                        } else {
-                            usedPercents = [account.usage.usagePercentage]
-                        }
-                        let item = createNativeQuotaMenuItem(
+                        insertQuotaMenuItem(
                             name: displayName,
-                            usedPercents: usedPercents,
+                            identifier: identifier,
+                            primaryUsage: account.usage.usagePercentage,
+                            details: account.details,
                             icon: iconForProvider(identifier),
                             isEnabled: !isUnavailableRateLimited,
-                            showsRemaining: true
+                            accountId: account.subscriptionId,
+                            at: &insertIndex
                         )
-                        item.tag = 999
-
-                        if item.isEnabled,
-                           let details = account.details,
-                           details.hasAnyValue {
-                            item.submenu = createDetailSubmenu(details, identifier: identifier, accountId: account.subscriptionId)
-                        }
-
-                        menu.insertItem(item, at: insertIndex)
-                        insertIndex += 1
                     }
                 } else if case .quotaBased(let remaining, let entitlement, _) = result.usage {
                     hasQuota = true
                     let singlePercent = entitlement > 0 ? (Double(entitlement - remaining) / Double(entitlement)) * 100 : 0
-
-                    let usedPercents: [Double]
-                    if identifier == .claude,
-                       let details = result.details,
-                       let fiveHour = details.fiveHourUsage,
-                       let sevenDay = details.sevenDayUsage {
-                        var percents: [Double] = [fiveHour, sevenDay]
-                        if let sonnetUsage = details.sonnetUsage {
-                            percents.append(sonnetUsage)
-                        }
-                        if let fableUsage = details.fableUsage {
-                            percents.append(fableUsage)
-                        }
-                        usedPercents = percents
-                    } else if identifier == .minimaxCodingPlan,
-                              let fiveHour = result.details?.fiveHourUsage,
-                              let sevenDay = result.details?.sevenDayUsage {
-                        usedPercents = [fiveHour, sevenDay]
-                    } else if identifier == .openCodeGo {
-                        let percents = [
-                            result.details?.fiveHourUsage,
-                            result.details?.sevenDayUsage,
-                            result.details?.openCodeGoMonthlyUsage
-                        ].compactMap { $0 }
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else if identifier == .grok {
-                        let percents = [result.details?.monthlyUsage].compactMap { $0 }
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else if identifier == .kimi,
-                              let fiveHour = result.details?.fiveHourUsage,
-                              let sevenDay = result.details?.sevenDayUsage {
-                        usedPercents = [fiveHour, sevenDay]
-                    } else if identifier == .codex {
-                        var percents = [singlePercent]
-                        if let secondary = result.details?.secondaryUsage {
-                            percents.append(secondary)
-                        }
-                        if let sparkPrimary = result.details?.sparkUsage {
-                            percents.append(sparkPrimary)
-                        }
-                        if let sparkSecondary = result.details?.sparkSecondaryUsage {
-                            percents.append(sparkSecondary)
-                        }
-                        usedPercents = percents
-                    } else if identifier == .cursor {
-                        let percents = [
-                            result.details?.cursorAutoUsage,
-                            result.details?.cursorApiUsage
-                        ].compactMap { $0 }
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else if identifier == .zaiCodingPlan {
-                        let percents = Self.zaiCodingPlanTopLevelPercents(details: result.details)
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else if identifier == .chutes {
-                        let percents = [Self.dailyPercentFromDetails(result.details), Self.chutesMonthlyPercentFromDetails(result.details)].compactMap { $0 }
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else if identifier == .nanoGpt {
-                        let percents = [
-                            result.details?.sevenDayUsage,
-                            result.details?.tokenUsagePercent,
-                            result.details?.mcpUsagePercent
-                        ].compactMap { $0 }
-                        usedPercents = percents.isEmpty ? [singlePercent] : percents
-                    } else {
-                        usedPercents = [singlePercent]
-                    }
-                    let item = createNativeQuotaMenuItem(name: identifier.displayName, usedPercents: usedPercents, icon: iconForProvider(identifier), showsRemaining: true)
-                    item.tag = 999
-
-                    if let details = result.details, details.hasAnyValue {
-                        item.submenu = createDetailSubmenu(details, identifier: identifier)
-                    }
-
-                    menu.insertItem(item, at: insertIndex)
-                    insertIndex += 1
+                    insertQuotaMenuItem(
+                        name: identifier.displayName,
+                        identifier: identifier,
+                        primaryUsage: singlePercent,
+                        details: result.details,
+                        icon: iconForProvider(identifier),
+                        isEnabled: true,
+                        accountId: nil,
+                        at: &insertIndex
+                    )
                 }
             } else if let errorMessage {
                 guard shouldDisplayErrorMenuItem(errorMessage) else {
@@ -2738,6 +2691,92 @@ final class StatusBarController: NSObject {
         showsRemaining: Bool = false
     ) -> NSMenuItem {
         return createNativeQuotaMenuItem(name: name, usedPercents: [usedPercent], icon: icon, isEnabled: isEnabled, showsRemaining: showsRemaining)
+    }
+
+    private func createNativeProviderMenuItem(
+        name: String,
+        usedPercents: [Double],
+        icon: NSImage?,
+        isEnabled: Bool
+    ) -> NSMenuItem {
+        let item = createNativeQuotaMenuItem(
+            name: name,
+            usedPercents: usedPercents,
+            icon: icon,
+            isEnabled: isEnabled,
+            showsRemaining: true
+        )
+        let color = isEnabled ? NSColor.labelColor : NSColor.disabledControlTextColor
+        item.attributedTitle = NSAttributedString(
+            string: name,
+            attributes: [
+                .font: MenuDesignToken.Typography.defaultFont,
+                .foregroundColor: color
+            ]
+        )
+        return item
+    }
+
+    private func createQuotaWindowRow(_ window: MenuQuotaWindow) -> NSMenuItem {
+        let row = NSMenuItem()
+        row.view = createDisabledLabelView(
+            text: MenuQuotaWindowBuilder.remainingText(for: window),
+            monospaced: true,
+            indent: MenuDesignToken.Spacing.leadingWithIcon - MenuDesignToken.Spacing.leadingOffset
+        )
+        row.isEnabled = false
+        row.tag = 999
+        return row
+    }
+
+    private func insertQuotaMenuItem(
+        name: String,
+        identifier: ProviderIdentifier,
+        primaryUsage: Double?,
+        details: DetailedUsage?,
+        icon: NSImage?,
+        isEnabled: Bool,
+        accountId: String?,
+        at insertIndex: inout Int
+    ) {
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: identifier,
+            primaryUsage: primaryUsage,
+            details: details
+        )
+        guard let firstWindow = windows.first else { return }
+
+        let item: NSMenuItem
+        if windows.count > 1 {
+            item = createNativeProviderMenuItem(
+                name: name,
+                usedPercents: windows.map(\.usedPercent),
+                icon: icon,
+                isEnabled: isEnabled
+            )
+        } else {
+            item = createNativeQuotaMenuItem(
+                name: name,
+                usedPercent: firstWindow.usedPercent,
+                icon: icon,
+                isEnabled: isEnabled,
+                showsRemaining: true
+            )
+        }
+        item.tag = 999
+
+        if isEnabled, let details, details.hasAnyValue {
+            item.submenu = createDetailSubmenu(details, identifier: identifier, accountId: accountId)
+        }
+
+        menu.insertItem(item, at: insertIndex)
+        insertIndex += 1
+
+        guard isEnabled, windows.count > 1 else { return }
+        for window in windows {
+            menu.insertItem(createQuotaWindowRow(window), at: insertIndex)
+            insertIndex += 1
+        }
     }
 
     private func unavailableUsageSuffix(for account: ProviderAccountResult, identifier: ProviderIdentifier) -> String? {
