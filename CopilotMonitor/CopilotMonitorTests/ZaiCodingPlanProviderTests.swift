@@ -123,7 +123,7 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
     /// the real `fetch()` pipeline with an injected API key (no credential store).
     private func makeProvider(quotaJSON: String) -> ZaiCodingPlanProvider {
         let session = makeSession()
-        let provider = ZaiCodingPlanProvider(tokenManager: .shared, session: session, apiKey: "sk-test-fake")
+        let provider = ZaiCodingPlanProvider(tokenManager: .shared, session: session, apiKey: "zai-test-fake")
 
         MockURLProtocol.requestHandler = { request in
             let url = try XCTUnwrap(request.url)
@@ -428,18 +428,32 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         guard let menu = menu(from: controller) else {
             return XCTFail("StatusBarController did not build its main menu")
         }
-        let rows = menu.items
-            .compactMap { $0.attributedTitle?.string }
-            .filter { $0.hasPrefix(ProviderIdentifier.zaiCodingPlan.displayName) }
 
-        XCTAssertEqual(rows.count, 2, "Expected two real Z.AI rows, got: \(rows)")
-        XCTAssertTrue(rows.contains { $0.contains("12%, 1%, 2%") }, "Missing token/weekly/MCP row: \(rows)")
-
-        let weeklyOnlyRows = rows.filter { $0.contains("1%") && !$0.contains("12%") }
-        XCTAssertEqual(weeklyOnlyRows.count, 1, "Expected one weekly-only row: \(rows)")
-        if let weeklyOnlyRow = weeklyOnlyRows.first {
-            XCTAssertFalse(weeklyOnlyRow.contains("2%"), "Weekly-only row fabricated MCP usage: \(weeklyOnlyRows)")
+        // Parent rows no longer carry percentages; child rows do. Collect both.
+        let items = menu.items
+        var parentLabels: [String] = []
+        var childLabels: [String] = []
+        for (index, item) in items.enumerated() {
+            let title = item.attributedTitle?.string ?? item.title
+            if title.hasPrefix(ProviderIdentifier.zaiCodingPlan.displayName) {
+                parentLabels.append(title)
+                // Child rows follow immediately after the parent.
+                var childIndex = index + 1
+                while childIndex < items.count,
+                      let childView = items[childIndex].view,
+                      !items[childIndex].isSeparatorItem {
+                    let labels = childView.subviews.compactMap { ($0 as? NSTextField)?.stringValue }
+                    childLabels.append(contentsOf: labels)
+                    childIndex += 1
+                }
+            }
         }
+
+        XCTAssertEqual(parentLabels.count, 2, "Expected two real Z.A.I parents, got: \(parentLabels)")
+        XCTAssertTrue(parentLabels.allSatisfy { !$0.contains("%") }, "Parent rows must not contain percentages: \(parentLabels)")
+        XCTAssertTrue(childLabels.contains { $0.contains("12%") }, "Missing token child row: \(childLabels)")
+        XCTAssertTrue(childLabels.contains { $0.contains("1%") }, "Missing weekly child row: \(childLabels)")
+        XCTAssertTrue(childLabels.contains { $0.contains("2%") }, "Missing MCP child row: \(childLabels)")
     }
 
     /// A Z.AI weekly detail window with a reset timestamp must render the

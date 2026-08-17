@@ -22,6 +22,9 @@ enum MenuDesignToken {
         
         /// Status indicator dot size (e.g., circle.fill for status)
         static let statusDotSize: CGFloat = 8
+
+        /// Indent for child rows under a provider parent row.
+        static let childRowIndent: CGFloat = 18
     }
     
     /// Spacing and margin constants for layout

@@ -32,6 +32,52 @@ struct MenuQuotaWindow: Equatable {
 /// Builds the compact, labeled quota windows shown below multi-window providers.
 /// Provider values remain USED percentages; conversion to REMAINING is display-only.
 enum MenuQuotaWindowBuilder {
+    /// A single two-column metric row rendered under a parent provider row.
+    struct MetricRow: Equatable {
+        let label: String
+        let value: String
+    }
+
+    /// Quota-style rows for a provider: each window becomes a "<label>: <used>% used" row.
+    static func quotaMetricRows(
+        for identifier: ProviderIdentifier,
+        primaryUsage: Double?,
+        details: DetailedUsage?
+    ) -> [MetricRow] {
+        let windows = windows(for: identifier, primaryUsage: primaryUsage, details: details)
+        return windows.map { window in
+            MetricRow(
+                label: window.label,
+                value: "\(UsagePercentDisplayFormatter.string(from: window.usedPercent)) used"
+            )
+        }
+    }
+
+    /// PAYG-style rows: a single Balance/Spent row plus optional Granted/Topped-up details.
+    static func payAsYouGoMetricRows(
+        creditsBalance: Double?,
+        creditsRemaining: Double?,
+        cost: Double?,
+        currencySymbol: String,
+        balanceGranted: Double? = nil,
+        balanceToppedUp: Double? = nil
+    ) -> [MetricRow] {
+        let primary = MenuDisplayFormatter.payAsYouGoMetric(
+            creditsBalance: creditsBalance,
+            creditsRemaining: creditsRemaining,
+            cost: cost,
+            currencySymbol: currencySymbol
+        )
+        var rows = [primary]
+        if let granted = balanceGranted, granted > 0 {
+            rows.append(MetricRow(label: "Granted", value: MenuDisplayFormatter.leftAmountText(symbol: currencySymbol, amount: granted)))
+        }
+        if let toppedUp = balanceToppedUp, toppedUp > 0 {
+            rows.append(MetricRow(label: "Topped-up", value: MenuDisplayFormatter.leftAmountText(symbol: currencySymbol, amount: toppedUp)))
+        }
+        return rows
+    }
+
     static func windows(
         for identifier: ProviderIdentifier,
         primaryUsage: Double?,
@@ -1800,12 +1846,10 @@ final class StatusBarController: NSObject {
                     }
                     let isUnavailableRateLimited = unavailableLabel == "Rate limited"
                     let usedPercent = account.usage.usagePercentage
-                    let quotaItem = createNativeQuotaMenuItem(
+                    let quotaItem = createProviderParentMenuItem(
                         name: displayName,
-                        usedPercent: usedPercent,
                         icon: iconForProvider(.copilot),
-                        isEnabled: !isUnavailableRateLimited,
-                        showsRemaining: true
+                        isEnabled: !isUnavailableRateLimited
                     )
                     quotaItem.tag = 999
 
@@ -1817,6 +1861,18 @@ final class StatusBarController: NSObject {
 
                     menu.insertItem(quotaItem, at: insertIndex)
                     insertIndex += 1
+
+                    if !isUnavailableRateLimited {
+                        let row = NSMenuItem()
+                        row.view = createMetricRowView(
+                            label: "Monthly",
+                            value: "\(UsagePercentDisplayFormatter.string(from: usedPercent)) used"
+                        )
+                        row.isEnabled = false
+                        row.tag = 999
+                        menu.insertItem(row, at: insertIndex)
+                        insertIndex += 1
+                    }
              }
          } else if let copilotUsage = currentUsage {
                 hasQuota = true
@@ -1824,11 +1880,10 @@ final class StatusBarController: NSObject {
                 let used = copilotUsage.usedRequests
                 let usedPercent = limit > 0 ? (Double(used) / Double(limit)) * 100 : 0
 
-                let quotaItem = createNativeQuotaMenuItem(
+                let quotaItem = createProviderParentMenuItem(
                     name: ProviderIdentifier.copilot.displayName,
-                    usedPercent: usedPercent,
                     icon: iconForProvider(.copilot),
-                    showsRemaining: true
+                    isEnabled: true
                 )
                 quotaItem.tag = 999
 
@@ -1909,6 +1964,16 @@ final class StatusBarController: NSObject {
                 }
 
                 menu.insertItem(quotaItem, at: insertIndex)
+                insertIndex += 1
+
+                let row = NSMenuItem()
+                row.view = createMetricRowView(
+                    label: "Monthly",
+                    value: "\(UsagePercentDisplayFormatter.string(from: usedPercent)) used"
+                )
+                row.isEnabled = false
+                row.tag = 999
+                menu.insertItem(row, at: insertIndex)
                 insertIndex += 1
             }
 
@@ -2253,22 +2318,17 @@ final class StatusBarController: NSObject {
             } else if let result {
                 if case .payAsYouGo(_, let cost, _) = result.usage {
                     hasPayAsYouGo = true
-                    // Generic balance rendering: any provider exposing
-                    // `creditsBalance` or `creditsRemaining` shows
-                    // "<currency><amount> left"; pure cost providers show
-                    // "<currency><amount> spent". No provider-specific cases.
-                    let amountText = MenuDisplayFormatter.payAsYouGoAmountText(
+                    let metric = MenuDisplayFormatter.payAsYouGoMetric(
                         creditsBalance: result.details?.creditsBalance,
                         creditsRemaining: result.details?.creditsRemaining,
                         cost: cost,
                         currencySymbol: result.details?.balanceCurrencySymbol ?? ""
                     )
-                    let title = "\(identifier.displayName) \(amountText)"
-                    let item = NSMenuItem(
-                        title: title,
-                        action: nil, keyEquivalent: ""
+                    let item = createProviderParentMenuItem(
+                        name: identifier.displayName,
+                        icon: iconForProvider(identifier),
+                        isEnabled: true
                     )
-                    item.image = iconForProvider(identifier)
                     item.tag = 999
 
                     if let details = result.details, details.hasAnyValue {
@@ -2277,6 +2337,23 @@ final class StatusBarController: NSObject {
 
                     menu.insertItem(item, at: insertIndex)
                     insertIndex += 1
+
+                    let rows = MenuQuotaWindowBuilder.payAsYouGoMetricRows(
+                        creditsBalance: result.details?.creditsBalance,
+                        creditsRemaining: result.details?.creditsRemaining,
+                        cost: cost,
+                        currencySymbol: result.details?.balanceCurrencySymbol ?? "",
+                        balanceGranted: result.details?.balanceGranted,
+                        balanceToppedUp: result.details?.balanceToppedUp
+                    )
+                    for row in rows {
+                        let rowItem = NSMenuItem()
+                        rowItem.view = createMetricRowView(label: row.label, value: row.value)
+                        rowItem.isEnabled = false
+                        rowItem.tag = 999
+                        menu.insertItem(rowItem, at: insertIndex)
+                        insertIndex += 1
+                    }
                 }
             } else if let errorMessage {
                 guard shouldDisplayErrorMenuItem(errorMessage) else {
@@ -2697,6 +2774,21 @@ final class StatusBarController: NSObject {
         return createNativeQuotaMenuItem(name: name, usedPercents: [usedPercent], icon: icon, isEnabled: isEnabled, showsRemaining: showsRemaining)
     }
 
+    private func createProviderParentMenuItem(name: String, icon: NSImage?, isEnabled: Bool) -> NSMenuItem {
+        let item = NSMenuItem()
+        let color = isEnabled ? NSColor.labelColor : NSColor.disabledControlTextColor
+        item.attributedTitle = NSAttributedString(
+            string: name,
+            attributes: [
+                .font: MenuDesignToken.Typography.defaultFont,
+                .foregroundColor: color
+            ]
+        )
+        item.image = icon
+        item.isEnabled = isEnabled
+        return item
+    }
+
     private func createNativeProviderMenuItem(
         name: String,
         usedPercents: [Double],
@@ -2743,30 +2835,14 @@ final class StatusBarController: NSObject {
         accountId: String?,
         at insertIndex: inout Int
     ) {
-        let windows = MenuQuotaWindowBuilder.windows(
+        let rows = MenuQuotaWindowBuilder.quotaMetricRows(
             for: identifier,
             primaryUsage: primaryUsage,
             details: details
         )
-        guard let firstWindow = windows.first else { return }
+        guard !rows.isEmpty else { return }
 
-        let item: NSMenuItem
-        if windows.count > 1 {
-            item = createNativeProviderMenuItem(
-                name: name,
-                usedPercents: windows.map(\.usedPercent),
-                icon: icon,
-                isEnabled: isEnabled
-            )
-        } else {
-            item = createNativeQuotaMenuItem(
-                name: name,
-                usedPercent: firstWindow.usedPercent,
-                icon: icon,
-                isEnabled: isEnabled,
-                showsRemaining: true
-            )
-        }
+        let item = createProviderParentMenuItem(name: name, icon: icon, isEnabled: isEnabled)
         item.tag = 999
 
         if isEnabled, let details, details.hasAnyValue {
@@ -2776,9 +2852,13 @@ final class StatusBarController: NSObject {
         menu.insertItem(item, at: insertIndex)
         insertIndex += 1
 
-        guard isEnabled, windows.count > 1 else { return }
-        for window in windows {
-            menu.insertItem(createQuotaWindowRow(window), at: insertIndex)
+        guard isEnabled else { return }
+        for row in rows {
+            let rowItem = NSMenuItem()
+            rowItem.view = createMetricRowView(label: row.label, value: row.value)
+            rowItem.isEnabled = false
+            rowItem.tag = 999
+            menu.insertItem(rowItem, at: insertIndex)
             insertIndex += 1
         }
     }
@@ -3271,6 +3351,42 @@ final class StatusBarController: NSObject {
     }
 
      // MARK: - Custom Menu Item Views
+
+    func createMetricRowView(label: String, value: String, indent: CGFloat = 0) -> NSView {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: MenuDesignToken.Dimension.menuWidth, height: MenuDesignToken.Dimension.itemHeight))
+
+        let labelFont = NSFont.systemFont(ofSize: MenuDesignToken.Dimension.fontSize)
+        let valueFont = NSFont.monospacedDigitSystemFont(ofSize: MenuDesignToken.Dimension.fontSize, weight: .regular)
+        let textColor: NSColor = .secondaryLabelColor
+
+        let labelField = NSTextField(labelWithString: label)
+        labelField.font = labelFont
+        labelField.textColor = textColor
+        labelField.translatesAutoresizingMaskIntoConstraints = false
+
+        let valueField = NSTextField(labelWithString: value)
+        valueField.font = valueFont
+        valueField.textColor = textColor
+        valueField.alignment = .right
+        valueField.translatesAutoresizingMaskIntoConstraints = false
+
+        view.addSubview(labelField)
+        view.addSubview(valueField)
+
+        let leading = MenuDesignToken.Spacing.leadingOffset + MenuDesignToken.Dimension.childRowIndent + indent
+        let trailing = MenuDesignToken.Spacing.trailingMargin
+
+        NSLayoutConstraint.activate([
+            labelField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: leading),
+            labelField.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            valueField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -trailing),
+            valueField.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            valueField.leadingAnchor.constraint(greaterThanOrEqualTo: labelField.trailingAnchor, constant: 8)
+        ])
+
+        return view
+    }
 
     func createHeaderView(title: String) -> NSView {
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 23))

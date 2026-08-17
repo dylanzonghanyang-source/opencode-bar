@@ -62,6 +62,107 @@ enum MenuDisplayFormatter {
         }
         return String(format: "%@0.00", symbol)
     }
+
+    /// PAYG metric split for the unified two-column menu row.
+    /// - balance/remaining → label "Balance", value "<currency><amount> left"
+    /// - cost-only         → label "Spent", value "<currency><amount> spent"
+    /// - no value          → label "Balance", value "<currency>0.00"
+    static func payAsYouGoMetric(
+        creditsBalance: Double?,
+        creditsRemaining: Double?,
+        cost: Double?,
+        currencySymbol: String
+    ) -> MenuPayGoMetric {
+        let symbol = currencySymbol.isEmpty ? "$" : currencySymbol
+        if let balance = creditsBalance ?? creditsRemaining {
+            return MenuPayGoMetric(
+                label: "Balance",
+                value: leftAmountText(symbol: symbol, amount: balance)
+            )
+        }
+        if let cost {
+            return MenuPayGoMetric(
+                label: "Spent",
+                value: spentAmountText(symbol: symbol, amount: cost)
+            )
+        }
+        return MenuPayGoMetric(
+            label: "Balance",
+            value: String(format: "%@0.00", symbol)
+        )
+    }
+}
+
+/// Unified two-column metric row model used for both QUOTA and PAYGO child rows.
+struct MenuPayGoMetric {
+    let label: String
+    let value: String
+}
+
+/// Metric row model for a provider's top-level menu entry.
+/// Keeps the textual title and an optional right-hand value/percent.
+struct MenuProviderMetric {
+    let title: String
+    let value: String?
+}
+
+/// Build top-level and child metric rows for the unified menu layout.
+/// Values stay in USED semantics where applicable; display converts to remaining.
+enum MenuProviderMetricBuilder {
+    /// Top-level QUOTA row: provider name + used percent(s) on the right.
+    /// Percentages are shown in USED form because the top-level row remains
+    /// a summary of consumption.
+    static func quotaParentMetric(
+        name: String,
+        usedPercents: [Double]
+    ) -> MenuProviderMetric {
+        guard !usedPercents.isEmpty else {
+            return MenuProviderMetric(title: name, value: nil)
+        }
+        let parts = usedPercents.map { UsagePercentDisplayFormatter.string(from: $0) }
+        return MenuProviderMetric(title: name, value: parts.joined(separator: ", "))
+    }
+
+    /// Top-level PAYG row: provider name + balance/spent value on the right.
+    static func payAsYouGoParentMetric(
+        name: String,
+        creditsBalance: Double?,
+        creditsRemaining: Double?,
+        cost: Double?,
+        currencySymbol: String
+    ) -> MenuProviderMetric {
+        let metric = MenuDisplayFormatter.payAsYouGoMetric(
+            creditsBalance: creditsBalance,
+            creditsRemaining: creditsRemaining,
+            cost: cost,
+            currencySymbol: currencySymbol
+        )
+        return MenuProviderMetric(title: name, value: metric.value)
+    }
+
+    /// Child row for the two-column layout under a provider.
+    static func payAsYouGoChildMetric(
+        creditsBalance: Double?,
+        creditsRemaining: Double?,
+        cost: Double?,
+        currencySymbol: String
+    ) -> MenuPayGoMetric {
+        MenuDisplayFormatter.payAsYouGoMetric(
+            creditsBalance: creditsBalance,
+            creditsRemaining: creditsRemaining,
+            cost: cost,
+            currencySymbol: currencySymbol
+        )
+    }
+
+    /// Quota child row: labeled remaining percentage.
+    static func quotaChildMetric(label: String, usedPercent: Double) -> MenuPayGoMetric {
+        let remaining = MenuDisplayFormatter.remainingPercent(fromUsedPercent: usedPercent)
+        return MenuPayGoMetric(
+            label: label,
+            value: UsagePercentDisplayFormatter.string(from: remaining) + " left"
+        )
+    }
 }
 
 enum StatusBarQuotaVisibilityPolicy {

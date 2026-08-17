@@ -17,10 +17,13 @@ final class TimiccProvider: ProviderProtocol {
 
     private let tokenManager: TokenManager
     private let session: URLSession
+    /// Optional injected API key for tests; falls back to the credential store.
+    private let apiKeyOverride: String?
 
-    init(tokenManager: TokenManager = .shared, session: URLSession = .shared) {
+    init(tokenManager: TokenManager = .shared, session: URLSession = .shared, apiKey: String? = nil) {
         self.tokenManager = tokenManager
         self.session = session
+        self.apiKeyOverride = apiKey
     }
 
     // MARK: - API Response Structures
@@ -137,7 +140,7 @@ final class TimiccProvider: ProviderProtocol {
     func fetch() async throws -> ProviderResult {
         logger.info("TIMICC balance fetch started")
 
-        guard let apiKey = tokenManager.getTimiccAPIKey() else {
+        guard let apiKey = apiKeyOverride ?? tokenManager.getTimiccAPIKey() else {
             logger.error("TIMICC API key not found")
             throw ProviderError.authenticationFailed("TIMICC API key not available")
         }
@@ -159,11 +162,11 @@ final class TimiccProvider: ProviderProtocol {
             authSource: tokenManager.lastFoundAuthPath?.path ?? "~/.local/share/opencode/auth.json"
         )
 
-        // `cost` carries the balance for the menu row; the aggregate spend
-        // calculation explicitly excludes `.timicc` so the balance is never
-        // counted as money already spent (same pattern as DeepSeek).
+        // `cost` stays nil: it represents money already spent, while TIMICC
+        // reports money remaining. The menu row reads the balance from details
+        // and the aggregate spend total never counts this provider.
         return ProviderResult(
-            usage: .payAsYouGo(utilization: 0, cost: balance, resetsAt: nil),
+            usage: .payAsYouGo(utilization: 0, cost: nil, resetsAt: nil),
             details: details
         )
     }

@@ -164,6 +164,30 @@ final class DashScopeProviderTests: XCTestCase {
         XCTAssertEqual(rows[0].value, 50.00, accuracy: 0.001)
     }
 
+    /// The new unified two-column metric row must surface balance as the
+    /// primary PAYG child row under a provider parent.
+    @MainActor
+    func testDashScopePayAsYouGoMetricRows() {
+        let details = DetailedUsage(
+            creditsBalance: 50.00,
+            balanceCurrency: "CNY",
+            balanceGranted: 0.0,
+            balanceToppedUp: 50.00
+        )
+        let rows = MenuQuotaWindowBuilder.payAsYouGoMetricRows(
+            creditsBalance: details.creditsBalance,
+            creditsRemaining: nil,
+            cost: nil,
+            currencySymbol: details.balanceCurrencySymbol,
+            balanceGranted: details.balanceGranted,
+            balanceToppedUp: details.balanceToppedUp
+        )
+        XCTAssertEqual(rows.map(\.label), ["Balance", "Granted", "Topped-up"])
+        XCTAssertEqual(rows[0].value, "¥50.00 left")
+        XCTAssertEqual(rows[1].value, "¥0.00 left")
+        XCTAssertEqual(rows[2].value, "¥50.00 left")
+    }
+
     // MARK: - Error paths
 
     func testMissingSecTokenThrowsAuthentication() async {

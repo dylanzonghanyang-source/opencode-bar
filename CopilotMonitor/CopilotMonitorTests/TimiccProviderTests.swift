@@ -170,12 +170,33 @@ final class TimiccProviderTests: XCTestCase {
             return XCTFail("Expected payAsYouGo usage")
         }
         XCTAssertEqual(utilization, 0)
-        XCTAssertEqual(cost, 53.46212396)
+        // Balance is not spend: cost must stay nil so the aggregate total is unaffected.
+        XCTAssertNil(cost)
 
         let details = try XCTUnwrap(result.details)
         XCTAssertEqual(details.creditsBalance, 53.46212396)
         XCTAssertEqual(details.balanceCurrency, "USD")
         XCTAssertEqual(details.balanceCurrencySymbol, "$")
+    }
+
+    /// The unified two-column metric row must render TIMICC balance as
+    /// "Balance: $53.46 left" and skip zero granted/topped-up rows.
+    @MainActor
+    func testTimiccPayAsYouGoMetricRows() {
+        let details = DetailedUsage(
+            creditsBalance: 53.46212396,
+            balanceCurrency: "USD"
+        )
+        let rows = MenuQuotaWindowBuilder.payAsYouGoMetricRows(
+            creditsBalance: details.creditsBalance,
+            creditsRemaining: nil,
+            cost: nil,
+            currencySymbol: details.balanceCurrencySymbol,
+            balanceGranted: details.balanceGranted,
+            balanceToppedUp: details.balanceToppedUp
+        )
+        XCTAssertEqual(rows.map(\.label), ["Balance"])
+        XCTAssertEqual(rows[0].value, "$53.46 left")
     }
 
     func testFetchPropagatesHTTPError() async throws {

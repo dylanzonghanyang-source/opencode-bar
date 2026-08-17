@@ -75,9 +75,9 @@ extension StatusBarController {
             }
 
         case .timicc:
-            if let balance = details.creditsBalance {
+            for (label, value) in Self.timiccBalanceRows(details: details) {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Balance: %@%.2f", details.balanceCurrencySymbol, balance))
+                item.view = createDisabledLabelView(text: String(format: "%@: %@%.2f", label, details.balanceCurrencySymbol, value))
                 submenu.addItem(item)
             }
 
@@ -1057,6 +1057,17 @@ extension StatusBarController {
         return submenu
     }
 
+    /// Label/value pairs for the TIMICC balance detail row, in display order.
+    /// Pure function for testability.
+    static func timiccBalanceRows(details: DetailedUsage) -> [(label: String, value: Double)] {
+        let rows: [(String, Double?)] = [
+            ("Balance", details.creditsBalance)
+        ]
+        return rows.compactMap { label, value -> (label: String, value: Double)? in
+            value.map { (label: label, value: $0) }
+        }
+    }
+
     /// Label/value pairs for the DeepSeek balance detail rows, in display
     /// order. Extracted as a pure function so the menu rows are testable
     /// without instantiating StatusBarController.
@@ -1076,6 +1087,29 @@ extension StatusBarController {
     static func dashScopeBalanceRows(details: DetailedUsage) -> [(label: String, value: Double)] {
         let rows: [(String, Double?)] = [
             ("Account Balance", details.creditsBalance)
+        ]
+        return rows.compactMap { label, value -> (label: String, value: Double)? in
+            value.map { (label: label, value: $0) }
+        }
+    }
+
+    /// Label/value pairs for OpenCode Go balance details.
+    static func openCodeGoBalanceRows(details: DetailedUsage) -> [(label: String, value: Double)] {
+        let rows: [(String, Double?)] = [
+            ("Monthly", details.openCodeGoMonthlyUsage),
+            ("5h", details.fiveHourUsage),
+            ("Weekly", details.sevenDayUsage)
+        ]
+        return rows.compactMap { label, value -> (label: String, value: Double)? in
+            value.map { (label: label, value: $0) }
+        }
+    }
+
+    /// Label/value pairs for Z.AI coding plan quota details.
+    static func zaiCodingPlanBalanceRows(details: DetailedUsage) -> [(label: String, value: Double)] {
+        let rows: [(String, Double?)] = [
+            ("5h", details.tokenUsagePercent),
+            ("Weekly", details.weeklyUsagePercent)
         ]
         return rows.compactMap { label, value -> (label: String, value: Double)? in
             value.map { (label: label, value: $0) }
