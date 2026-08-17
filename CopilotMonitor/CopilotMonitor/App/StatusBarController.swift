@@ -69,7 +69,7 @@ enum MenuQuotaWindowBuilder {
             cost: cost,
             currencySymbol: currencySymbol
         )
-        return [primary]
+        return [MetricRow(label: primary.label, value: primary.value)]
     }
 
     static func windows(
