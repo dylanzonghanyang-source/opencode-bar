@@ -27,11 +27,22 @@ final class DashScopeProvider: ProviderProtocol {
 
     init(
         cookieService: BrowserCookieService = .shared,
-        session: URLSession = .shared,
+        session: URLSession? = nil,
         cookieHeader: String? = nil
     ) {
         self.cookieService = cookieService
-        self.session = session
+        if let session {
+            self.session = session
+        } else {
+            // Dedicated ephemeral session: the shared session's
+            // HTTPCookieStorage can hold stale Alibaba cookies that replace
+            // our manually-set Cookie header before the request is sent.
+            // httpShouldSetCookies=false keeps the hand-built header intact.
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.httpShouldSetCookies = false
+            configuration.httpCookieAcceptPolicy = .never
+            self.session = URLSession(configuration: configuration)
+        }
         self.cookieHeaderOverride = cookieHeader
     }
 
@@ -62,6 +73,10 @@ final class DashScopeProvider: ProviderProtocol {
                 }
             }
             let data: BalanceData?
+
+            enum CodingKeys: String, CodingKey {
+                case data = "Data"
+            }
         }
         let data: DataPayload?
     }
@@ -213,10 +228,18 @@ final class DashScopeProvider: ProviderProtocol {
             throw ProviderError.networkError("HTTP \(httpResponse.statusCode)")
         }
 
+        // Diagnostic: surface unexpected payloads (e.g. PostonlyOrTokenError
+        // from a stale sec_token) instead of a generic decode failure.
+        let rawBody = String(data: data.prefix(400), encoding: .utf8) ?? "<binary>"
+        if rawBody.contains("PostonlyOrTokenError") || rawBody.contains("ConsoleNeedLogin") {
+            logger.error("DashScope balance RPC rejected: \(rawBody)")
+            throw ProviderError.authenticationFailed("Alibaba Cloud rejected the console session (\(rawBody.prefix(80)))")
+        }
+
         do {
             return try JSONDecoder().decode(BalanceResponse.self, from: data)
         } catch {
-            logger.error("Failed to decode balance response: \(error.localizedDescription)")
+            logger.error("Failed to decode balance response: \(error.localizedDescription) body=\(rawBody)")
             throw ProviderError.decodingError(error.localizedDescription)
         }
     }
