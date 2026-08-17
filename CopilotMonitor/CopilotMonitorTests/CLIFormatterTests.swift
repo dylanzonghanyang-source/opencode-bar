@@ -512,4 +512,83 @@ final class CLIFormatterTests: XCTestCase {
         let json = try JSONFormatter.format([.openRouter: result])
         XCTAssertTrue(json.contains("\"cost\" : 12.34"), "JSON should keep cost, got:\n\(json)")
     }
+
+    // MARK: - MenuDisplayFormatter Tests
+
+    /// UI-only conversion: remaining = clamp(100 - used, 0...100).
+    func testRemainingPercentConversion() {
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 0), 100)
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 30), 70)
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 100), 0)
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 150), 0, "Over-use must clamp to 0 remaining")
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: -10), 100, "Negative used must clamp to 100 remaining")
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 72.5), 27.5)
+        XCTAssertEqual(MenuDisplayFormatter.remainingPercent(fromUsedPercent: 55), 45)
+    }
+
+    func testLeftAmountText() {
+        XCTAssertEqual(MenuDisplayFormatter.leftAmountText(symbol: "¥", amount: 88.88), "¥88.88 left")
+        XCTAssertEqual(MenuDisplayFormatter.leftAmountText(symbol: "$", amount: 12.34), "$12.34 left")
+    }
+
+    func testSpentAmountText() {
+        XCTAssertEqual(MenuDisplayFormatter.spentAmountText(symbol: "$", amount: 5.67), "$5.67 spent")
+        XCTAssertEqual(MenuDisplayFormatter.spentAmountText(symbol: "¥", amount: 1.25), "¥1.25 spent")
+    }
+
+    /// Balance-style providers (creditsBalance) render "<currency><amount> left".
+    func testPayAsYouGoAmountTextBalanceCreditsBalance() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: 103.49,
+            creditsRemaining: nil,
+            cost: nil,
+            currencySymbol: "¥"
+        )
+        XCTAssertEqual(text, "¥103.49 left")
+    }
+
+    /// Providers exposing creditsRemaining (e.g. OpenRouter) also render left,
+    /// taking priority over cost — no provider-specific UI condition.
+    func testPayAsYouGoAmountTextCreditsRemainingTakesPriorityOverCost() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: nil,
+            creditsRemaining: 12.34,
+            cost: 3.21,
+            currencySymbol: "$"
+        )
+        XCTAssertEqual(text, "$12.34 left")
+    }
+
+    /// Pure cost providers keep "<currency><amount> spent".
+    func testPayAsYouGoAmountTextCostFallback() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: nil,
+            creditsRemaining: nil,
+            cost: 5.67,
+            currencySymbol: "$"
+        )
+        XCTAssertEqual(text, "$5.67 spent")
+    }
+
+    /// Empty currency symbol falls back to "$" for balance-style providers.
+    func testPayAsYouGoAmountTextDefaultCurrency() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: 88.88,
+            creditsRemaining: nil,
+            cost: nil,
+            currencySymbol: ""
+        )
+        XCTAssertEqual(text, "$88.88 left")
+    }
+
+    /// No balance and no cost renders a zero placeholder, never a crash.
+    func testPayAsYouGoAmountTextEmptyFallback() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: nil,
+            creditsRemaining: nil,
+            cost: nil,
+            currencySymbol: ""
+        )
+        XCTAssertEqual(text, "$0.00")
+    }
 }

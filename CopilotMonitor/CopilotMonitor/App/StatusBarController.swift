@@ -1663,167 +1663,9 @@ final class StatusBarController: NSObject {
          menu.insertItem(separator1, at: insertIndex)
          insertIndex += 1
 
-          let payAsYouGoTotal = calculatePayAsYouGoTotal(providerResults: providerResults, copilotUsage: currentUsage)
-          let subscriptionTotal = SubscriptionSettingsManager.shared.getTotalMonthlySubscriptionCost()
-          
-          let payAsYouGoHeader = NSMenuItem()
-          payAsYouGoHeader.view = createHeaderView(title: String(format: "Pay-as-you-go: $%.2f", payAsYouGoTotal))
-          payAsYouGoHeader.tag = 999
-          menu.insertItem(payAsYouGoHeader, at: insertIndex)
-          insertIndex += 1
-
-         var hasPayAsYouGo = false
-
-            let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek]
-            for identifier in payAsYouGoOrder {
-                guard isProviderEnabled(identifier) else { continue }
-
-                let result = providerResults[identifier]
-                let errorMessage = lastProviderErrors[identifier]
-
-                if let errorMessage, shouldDisplayErrorStateEvenWithResult(errorMessage) {
-                    hasPayAsYouGo = true
-                    let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
-                    if item.isEnabled {
-                        item.submenu = createErrorSubmenu(identifier: identifier, result: result, errorMessage: errorMessage)
-                    }
-                    menu.insertItem(item, at: insertIndex)
-                    insertIndex += 1
-                } else if let result {
-                    if case .payAsYouGo(_, let cost, _) = result.usage {
-                        hasPayAsYouGo = true
-                        // Balance-style providers (DeepSeek) leave `cost` nil and
-                        // surface the remaining balance through details.
-                        let costValue = cost ?? result.details?.creditsBalance ?? 0.0
-                        let title: String
-                        if let symbol = result.details?.balanceCurrencySymbol, !symbol.isEmpty {
-                            title = String(format: "%@ (%@%.2f)", identifier.displayName, symbol, costValue)
-                        } else {
-                            title = String(format: "%@ ($%.2f)", identifier.displayName, costValue)
-                        }
-                        let item = NSMenuItem(
-                            title: title,
-                            action: nil, keyEquivalent: ""
-                        )
-                        item.image = iconForProvider(identifier)
-                        item.tag = 999
-
-                        if let details = result.details, details.hasAnyValue {
-                            item.submenu = createDetailSubmenu(details, identifier: identifier)
-                        }
-
-                       menu.insertItem(item, at: insertIndex)
-                       insertIndex += 1
-                   }
-                } else if let errorMessage {
-                    guard shouldDisplayErrorMenuItem(errorMessage) else {
-                        debugLog("updateMultiProviderMenu: hiding \(identifier.displayName) pay-as-you-go row because credentials are unavailable")
-                        continue
-                    }
-                    hasPayAsYouGo = true
-                    let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
-                    if item.isEnabled {
-                        item.submenu = createErrorSubmenu(identifier: identifier, result: nil, errorMessage: errorMessage)
-                    }
-                    menu.insertItem(item, at: insertIndex)
-                    insertIndex += 1
-                } else if loadingProviders.contains(identifier) {
-                    hasPayAsYouGo = true
-                    let item = NSMenuItem(title: "\(identifier.displayName) (Loading...)", action: nil, keyEquivalent: "")
-                    item.image = iconForProvider(identifier)
-                    item.isEnabled = false
-                    item.tag = 999
-                    menu.insertItem(item, at: insertIndex)
-                    insertIndex += 1
-                }
-           }
-
-            // Copilot Add-on (always show, even when $0.00)
-            if isProviderEnabled(.copilot) {
-                if let copilotResult = providerResults[.copilot],
-                   let details = copilotResult.details,
-                   let overageCost = details.copilotOverageCost {
-                    hasPayAsYouGo = true
-                    let addOnItem = NSMenuItem(
-                        title: String(format: "Copilot Add-on ($%.2f)", overageCost),
-                        action: nil, keyEquivalent: ""
-                    )
-                    addOnItem.image = iconForProvider(.copilot)
-                    addOnItem.tag = 999
-
-                    let submenu = NSMenu()
-                    let overageRequests = details.copilotOverageRequests ?? 0
-                    let overageItem = NSMenuItem()
-                    overageItem.view = createDisabledLabelView(text: String(format: "Overage Requests: %.0f", overageRequests))
-                    submenu.addItem(overageItem)
-
-                    submenu.addItem(NSMenuItem.separator())
-                    let historyItem = NSMenuItem(title: "Usage History", action: nil, keyEquivalent: "")
-                    historyItem.image = NSImage(systemSymbolName: "chart.bar.fill", accessibilityDescription: "Usage History")
-                    debugLog("updateMultiProviderMenu: calling createCopilotHistorySubmenu")
-                    historyItem.submenu = createCopilotHistorySubmenu()
-                    debugLog("updateMultiProviderMenu: createCopilotHistorySubmenu completed")
-                    submenu.addItem(historyItem)
-
-                    submenu.addItem(NSMenuItem.separator())
-
-                    if let email = details.email {
-                        let emailItem = NSMenuItem()
-                        emailItem.view = createDisabledLabelView(
-                            text: "Account: \(email)",
-                            icon: NSImage(systemSymbolName: "person.circle", accessibilityDescription: "User Account"),
-                            multiline: false
-                        )
-                        submenu.addItem(emailItem)
-                    }
-
-                    if let authSource = details.authSource {
-                        let authItem = NSMenuItem()
-                        authItem.view = createDisabledLabelView(
-                            text: "Token From: \(authSource)",
-                            icon: NSImage(systemSymbolName: "key", accessibilityDescription: "Auth Source"),
-                            multiline: true
-                        )
-                        submenu.addItem(authItem)
-                    }
-
-                    addOnItem.submenu = submenu
-                    menu.insertItem(addOnItem, at: insertIndex)
-                    insertIndex += 1
-                    debugLog("updateMultiProviderMenu: Copilot Add-on inserted with cost $\(overageCost)")
-                } else if loadingProviders.contains(.copilot) {
-                    hasPayAsYouGo = true
-                    let item = NSMenuItem(title: "Copilot Add-on (Loading...)", action: nil, keyEquivalent: "")
-                    item.image = iconForProvider(.copilot)
-                    item.isEnabled = false
-                    item.tag = 999
-                    menu.insertItem(item, at: insertIndex)
-                    insertIndex += 1
-                }
-            }
-
-        if !hasPayAsYouGo {
-            let noItem = NSMenuItem()
-            noItem.view = createDisabledLabelView(text: "No providers")
-            noItem.tag = 999
-            menu.insertItem(noItem, at: insertIndex)
-            insertIndex += 1
-        }
-
-        if hasPayAsYouGo {
-            insertIndex = insertPredictedEOMSection(at: insertIndex)
-        }
-
-        let separator2 = NSMenuItem.separator()
-        separator2.tag = 999
-        menu.insertItem(separator2, at: insertIndex)
-        insertIndex += 1
-
+         // QUOTA section comes first in the main menu information architecture.
          let quotaHeader = NSMenuItem()
-         let quotaTitle = subscriptionTotal > 0
-             ? String(format: "Quota Status: $%.0f/m", subscriptionTotal)
-             : "Quota Status"
-         quotaHeader.view = createHeaderView(title: quotaTitle)
+         quotaHeader.view = createHeaderView(title: "QUOTA")
          quotaHeader.tag = 999
          menu.insertItem(quotaHeader, at: insertIndex)
          insertIndex += 1
@@ -1866,7 +1708,8 @@ final class StatusBarController: NSObject {
                         name: displayName,
                         usedPercent: usedPercent,
                         icon: iconForProvider(.copilot),
-                        isEnabled: !isUnavailableRateLimited
+                        isEnabled: !isUnavailableRateLimited,
+                        showsRemaining: true
                     )
                     quotaItem.tag = 999
 
@@ -1888,7 +1731,8 @@ final class StatusBarController: NSObject {
                 let quotaItem = createNativeQuotaMenuItem(
                     name: ProviderIdentifier.copilot.displayName,
                     usedPercent: usedPercent,
-                    icon: iconForProvider(.copilot)
+                    icon: iconForProvider(.copilot),
+                    showsRemaining: true
                 )
                 quotaItem.tag = 999
 
@@ -2178,7 +2022,8 @@ final class StatusBarController: NSObject {
                             name: displayName,
                             usedPercents: usedPercents,
                             icon: iconForProvider(identifier),
-                            isEnabled: !isUnavailableRateLimited
+                            isEnabled: !isUnavailableRateLimited,
+                            showsRemaining: true
                         )
                         item.tag = 999
 
@@ -2260,7 +2105,7 @@ final class StatusBarController: NSObject {
                     } else {
                         usedPercents = [singlePercent]
                     }
-                    let item = createNativeQuotaMenuItem(name: identifier.displayName, usedPercents: usedPercents, icon: iconForProvider(identifier))
+                    let item = createNativeQuotaMenuItem(name: identifier.displayName, usedPercents: usedPercents, icon: iconForProvider(identifier), showsRemaining: true)
                     item.tag = 999
 
                     if let details = result.details, details.hasAnyValue {
@@ -2347,7 +2192,8 @@ final class StatusBarController: NSObject {
                     let item = createNativeQuotaMenuItem(
                         name: displayName,
                         usedPercents: usedPercents,
-                        icon: iconForProvider(.geminiCLI)
+                        icon: iconForProvider(identifier),
+                        showsRemaining: true
                     )
                     item.tag = 999
 
@@ -2415,6 +2261,163 @@ final class StatusBarController: NSObject {
             noItem.tag = 999
             menu.insertItem(noItem, at: insertIndex)
             insertIndex += 1
+        }
+
+        // PAYG section comes after QUOTA in the main menu information
+        // architecture.
+        let separator2 = NSMenuItem.separator()
+        separator2.tag = 999
+        menu.insertItem(separator2, at: insertIndex)
+        insertIndex += 1
+
+        let payAsYouGoHeader = NSMenuItem()
+        payAsYouGoHeader.view = createHeaderView(title: "PAYG")
+        payAsYouGoHeader.tag = 999
+        menu.insertItem(payAsYouGoHeader, at: insertIndex)
+        insertIndex += 1
+
+        var hasPayAsYouGo = false
+
+        let payAsYouGoOrder: [ProviderIdentifier] = [.openRouter, .openCodeZen, .deepSeek]
+        for identifier in payAsYouGoOrder {
+            guard isProviderEnabled(identifier) else { continue }
+
+            let result = providerResults[identifier]
+            let errorMessage = lastProviderErrors[identifier]
+
+            if let errorMessage, shouldDisplayErrorStateEvenWithResult(errorMessage) {
+                hasPayAsYouGo = true
+                let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
+                if item.isEnabled {
+                    item.submenu = createErrorSubmenu(identifier: identifier, result: result, errorMessage: errorMessage)
+                }
+                menu.insertItem(item, at: insertIndex)
+                insertIndex += 1
+            } else if let result {
+                if case .payAsYouGo(_, let cost, _) = result.usage {
+                    hasPayAsYouGo = true
+                    // Generic balance rendering: any provider exposing
+                    // `creditsBalance` or `creditsRemaining` shows
+                    // "<currency><amount> left"; pure cost providers show
+                    // "<currency><amount> spent". No provider-specific cases.
+                    let amountText = MenuDisplayFormatter.payAsYouGoAmountText(
+                        creditsBalance: result.details?.creditsBalance,
+                        creditsRemaining: result.details?.creditsRemaining,
+                        cost: cost,
+                        currencySymbol: result.details?.balanceCurrencySymbol ?? ""
+                    )
+                    let title = "\(identifier.displayName) \(amountText)"
+                    let item = NSMenuItem(
+                        title: title,
+                        action: nil, keyEquivalent: ""
+                    )
+                    item.image = iconForProvider(identifier)
+                    item.tag = 999
+
+                    if let details = result.details, details.hasAnyValue {
+                        item.submenu = createDetailSubmenu(details, identifier: identifier)
+                    }
+
+                    menu.insertItem(item, at: insertIndex)
+                    insertIndex += 1
+                }
+            } else if let errorMessage {
+                guard shouldDisplayErrorMenuItem(errorMessage) else {
+                    debugLog("updateMultiProviderMenu: hiding \(identifier.displayName) pay-as-you-go row because credentials are unavailable")
+                    continue
+                }
+                hasPayAsYouGo = true
+                let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
+                if item.isEnabled {
+                    item.submenu = createErrorSubmenu(identifier: identifier, result: nil, errorMessage: errorMessage)
+                }
+                menu.insertItem(item, at: insertIndex)
+                insertIndex += 1
+            } else if loadingProviders.contains(identifier) {
+                hasPayAsYouGo = true
+                let item = NSMenuItem(title: "\(identifier.displayName) (Loading...)", action: nil, keyEquivalent: "")
+                item.image = iconForProvider(identifier)
+                item.isEnabled = false
+                item.tag = 999
+                menu.insertItem(item, at: insertIndex)
+                insertIndex += 1
+            }
+        }
+
+        // Copilot Add-on (always show, even when $0.00)
+        if isProviderEnabled(.copilot) {
+            if let copilotResult = providerResults[.copilot],
+               let details = copilotResult.details,
+               let overageCost = details.copilotOverageCost {
+                hasPayAsYouGo = true
+                let addOnItem = NSMenuItem(
+                    title: String(format: "Copilot Add-on $%.2f spent", overageCost),
+                    action: nil, keyEquivalent: ""
+                )
+                addOnItem.image = iconForProvider(.copilot)
+                addOnItem.tag = 999
+
+                let submenu = NSMenu()
+                let overageRequests = details.copilotOverageRequests ?? 0
+                let overageItem = NSMenuItem()
+                overageItem.view = createDisabledLabelView(text: String(format: "Overage Requests: %.0f", overageRequests))
+                submenu.addItem(overageItem)
+
+                submenu.addItem(NSMenuItem.separator())
+                let historyItem = NSMenuItem(title: "Usage History", action: nil, keyEquivalent: "")
+                historyItem.image = NSImage(systemSymbolName: "chart.bar.fill", accessibilityDescription: "Usage History")
+                debugLog("updateMultiProviderMenu: calling createCopilotHistorySubmenu")
+                historyItem.submenu = createCopilotHistorySubmenu()
+                debugLog("updateMultiProviderMenu: createCopilotHistorySubmenu completed")
+                submenu.addItem(historyItem)
+
+                submenu.addItem(NSMenuItem.separator())
+
+                if let email = details.email {
+                    let emailItem = NSMenuItem()
+                    emailItem.view = createDisabledLabelView(
+                        text: "Account: \(email)",
+                        icon: NSImage(systemSymbolName: "person.circle", accessibilityDescription: "User Account"),
+                        multiline: false
+                    )
+                    submenu.addItem(emailItem)
+                }
+
+                if let authSource = details.authSource {
+                    let authItem = NSMenuItem()
+                    authItem.view = createDisabledLabelView(
+                        text: "Token From: \(authSource)",
+                        icon: NSImage(systemSymbolName: "key", accessibilityDescription: "Auth Source"),
+                        multiline: true
+                    )
+                    submenu.addItem(authItem)
+                }
+
+                addOnItem.submenu = submenu
+                menu.insertItem(addOnItem, at: insertIndex)
+                insertIndex += 1
+                debugLog("updateMultiProviderMenu: Copilot Add-on inserted with cost $\(overageCost)")
+            } else if loadingProviders.contains(.copilot) {
+                hasPayAsYouGo = true
+                let item = NSMenuItem(title: "Copilot Add-on (Loading...)", action: nil, keyEquivalent: "")
+                item.image = iconForProvider(.copilot)
+                item.isEnabled = false
+                item.tag = 999
+                menu.insertItem(item, at: insertIndex)
+                insertIndex += 1
+            }
+        }
+
+        if !hasPayAsYouGo {
+            let noItem = NSMenuItem()
+            noItem.view = createDisabledLabelView(text: "No providers")
+            noItem.tag = 999
+            menu.insertItem(noItem, at: insertIndex)
+            insertIndex += 1
+        }
+
+        if hasPayAsYouGo {
+            insertIndex = insertPredictedEOMSection(at: insertIndex)
         }
 
         let orphaned = calculateOrphanedSubscriptions(providerResults: providerResults)
@@ -2600,8 +2603,18 @@ final class StatusBarController: NSObject {
         return labels.joined(separator: " + ")
     }
 
-    /// Color for usage percentage: 70%+ → orange, 90%+ → red
-    private func colorForUsagePercent(_ percent: Double) -> NSColor {
+    /// Color for usage percentage: 70%+ → orange, 90%+ → red.
+    /// When `isRemaining` is true the scale is inverted: ≤30% → orange, ≤10% → red.
+    private func colorForUsagePercent(_ percent: Double, isRemaining: Bool = false) -> NSColor {
+        if isRemaining {
+            if percent <= 10 {
+                return .systemRed
+            } else if percent <= 30 {
+                return .systemOrange
+            } else {
+                return .secondaryLabelColor
+            }
+        }
         if percent >= 90 {
             return .systemRed
         } else if percent >= 70 {
@@ -2612,12 +2625,15 @@ final class StatusBarController: NSObject {
     }
     
     /// Creates NSMenuItem for quota providers with colored percentages.
-    /// Color: 70%+ orange, 90%+ red, 100%+ red+bold
+    /// Color: 70%+ orange, 90%+ red, 100%+ red+bold (USED semantics).
+    /// When `showsRemaining` is true the displayed value is converted to
+    /// REMAINING (clamped 0...100) and the color/bold thresholds invert.
     private func createNativeQuotaMenuItem(
         name: String,
         usedPercents: [Double],
         icon: NSImage?,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        showsRemaining: Bool = false
     ) -> NSMenuItem {
         let attributed = NSMutableAttributedString()
         let primaryColor = isEnabled ? NSColor.labelColor : NSColor.disabledControlTextColor
@@ -2642,11 +2658,22 @@ final class StatusBarController: NSObject {
         ))
         
         for (index, percent) in usedPercents.enumerated() {
-            let percentText = UsagePercentDisplayFormatter.string(from: percent)
-            let percentColor = isEnabled ? colorForUsagePercent(percent) : NSColor.disabledControlTextColor
-            let font: NSFont = isEnabled && percent >= 100
-                ? MenuDesignToken.Typography.monospacedBoldFont
-                : defaultFontUsagePercent
+            let displayPercent = showsRemaining
+                ? MenuDisplayFormatter.remainingPercent(fromUsedPercent: percent)
+                : percent
+            let percentText = UsagePercentDisplayFormatter.string(from: displayPercent)
+            let percentColor = isEnabled
+                ? colorForUsagePercent(displayPercent, isRemaining: showsRemaining)
+                : NSColor.disabledControlTextColor
+            let font: NSFont
+            if isEnabled {
+                let isExhausted = showsRemaining ? displayPercent <= 0 : percent >= 100
+                font = isExhausted
+                    ? MenuDesignToken.Typography.monospacedBoldFont
+                    : defaultFontUsagePercent
+            } else {
+                font = defaultFontUsagePercent
+            }
             
             attributed.append(NSAttributedString(
                 string: percentText,
@@ -2667,11 +2694,6 @@ final class StatusBarController: NSObject {
             }
         }
         
-        // attributed.append(NSAttributedString(
-        //     string: ")",
-        //     attributes: [.font: MenuDesignToken.Typography.defaultFont]
-        // ))
-        
         let item = NSMenuItem()
         item.attributedTitle = attributed
         item.image = icon
@@ -2680,9 +2702,28 @@ final class StatusBarController: NSObject {
         if let icon {
             if !isEnabled {
                 item.image = tintedImage(icon, color: .disabledControlTextColor)
-            } else if let maxPercent = usedPercents.max(), maxPercent >= 70 {
-                let iconColor: NSColor = maxPercent >= 90 ? .systemRed : .systemOrange
-                item.image = tintedImage(icon, color: iconColor)
+            } else {
+                // Warn on the most critical window: highest used (USED) or
+                // lowest remaining (REMAINING).
+                let remainingPercents = usedPercents.map {
+                    MenuDisplayFormatter.remainingPercent(fromUsedPercent: $0)
+                }
+                let alertValue = showsRemaining
+                    ? (remainingPercents.min() ?? 0)
+                    : (usedPercents.max() ?? 0)
+                if showsRemaining {
+                    if alertValue <= 10 {
+                        item.image = tintedImage(icon, color: .systemRed)
+                    } else if alertValue <= 30 {
+                        item.image = tintedImage(icon, color: .systemOrange)
+                    }
+                } else {
+                    if alertValue >= 90 {
+                        item.image = tintedImage(icon, color: .systemRed)
+                    } else if alertValue >= 70 {
+                        item.image = tintedImage(icon, color: .systemOrange)
+                    }
+                }
             }
         }
         

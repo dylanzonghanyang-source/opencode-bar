@@ -18,6 +18,52 @@ enum UsagePercentDisplayFormatter {
     }
 }
 
+/// UI-only formatting helpers for the main menu.
+///
+/// Internal data keeps USED semantics; display converts used → remaining where
+/// requested. All helpers are pure so they can be unit-tested without AppKit.
+enum MenuDisplayFormatter {
+    /// Converts a USED percent to a REMAINING percent for display,
+    /// clamped to 0...100 (never negative, never above 100).
+    static func remainingPercent(fromUsedPercent usedPercent: Double) -> Double {
+        min(max(100 - usedPercent, 0), 100)
+    }
+
+    /// Balance-style label: "¥88.88 left"
+    static func leftAmountText(symbol: String, amount: Double) -> String {
+        String(format: "%@%.2f left", symbol, amount)
+    }
+
+    /// Cost-style label: "$12.34 spent"
+    static func spentAmountText(symbol: String, amount: Double) -> String {
+        String(format: "%@%.2f spent", symbol, amount)
+    }
+
+    /// PAYG row label, driven by model semantics (no provider-specific cases):
+    /// - `creditsBalance` (DeepSeek-style) → "<currency><amount> left"
+    /// - `creditsRemaining` (OpenRouter-style) → "<currency><amount> left"
+    /// - otherwise `cost` → "<currency><amount> spent"
+    /// - nothing → "<currency>0.00"
+    ///
+    /// Balance takes priority over cost so any future provider exposing a
+    /// balance renders "left" without a provider-specific UI condition.
+    static func payAsYouGoAmountText(
+        creditsBalance: Double?,
+        creditsRemaining: Double?,
+        cost: Double?,
+        currencySymbol: String
+    ) -> String {
+        let symbol = currencySymbol.isEmpty ? "$" : currencySymbol
+        if let balance = creditsBalance ?? creditsRemaining {
+            return leftAmountText(symbol: symbol, amount: balance)
+        }
+        if let cost {
+            return spentAmountText(symbol: symbol, amount: cost)
+        }
+        return String(format: "%@0.00", symbol)
+    }
+}
+
 enum StatusBarQuotaVisibilityPolicy {
     static let exhaustedUsageThreshold = 100.0
 
