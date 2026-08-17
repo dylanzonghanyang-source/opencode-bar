@@ -2192,7 +2192,7 @@ final class StatusBarController: NSObject {
                     let item = createNativeQuotaMenuItem(
                         name: displayName,
                         usedPercents: usedPercents,
-                        icon: iconForProvider(identifier),
+                        icon: iconForProvider(.geminiCLI),
                         showsRemaining: true
                     )
                     item.tag = 999
@@ -2734,9 +2734,10 @@ final class StatusBarController: NSObject {
         name: String,
         usedPercent: Double,
         icon: NSImage?,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        showsRemaining: Bool = false
     ) -> NSMenuItem {
-        return createNativeQuotaMenuItem(name: name, usedPercents: [usedPercent], icon: icon, isEnabled: isEnabled)
+        return createNativeQuotaMenuItem(name: name, usedPercents: [usedPercent], icon: icon, isEnabled: isEnabled, showsRemaining: showsRemaining)
     }
 
     private func unavailableUsageSuffix(for account: ProviderAccountResult, identifier: ProviderIdentifier) -> String? {
