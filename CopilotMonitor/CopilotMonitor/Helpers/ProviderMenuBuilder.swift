@@ -74,6 +74,13 @@ extension StatusBarController {
                 submenu.addItem(item)
             }
 
+        case .dashScope:
+            for (label, value) in Self.dashScopeBalanceRows(details: details) {
+                let item = NSMenuItem()
+                item.view = createDisabledLabelView(text: String(format: "%@: %@%.2f", label, details.balanceCurrencySymbol, value))
+                submenu.addItem(item)
+            }
+
         case .openRouter:
             if let remaining = details.creditsRemaining {
                 let item = NSMenuItem()
@@ -1051,6 +1058,17 @@ extension StatusBarController {
             ("Balance", details.creditsBalance),
             ("Topped-up", details.balanceToppedUp),
             ("Granted", details.balanceGranted)
+        ]
+        return rows.compactMap { label, value -> (label: String, value: Double)? in
+            value.map { (label: label, value: $0) }
+        }
+    }
+
+    /// Label/value pairs for the DashScope account balance detail rows, in
+    /// display order. Pure function for testability.
+    static func dashScopeBalanceRows(details: DetailedUsage) -> [(label: String, value: Double)] {
+        let rows: [(String, Double?)] = [
+            ("Account Balance", details.creditsBalance)
         ]
         return rows.compactMap { label, value -> (label: String, value: Double)? in
             value.map { (label: label, value: $0) }

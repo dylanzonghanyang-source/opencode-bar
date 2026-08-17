@@ -1144,7 +1144,7 @@ final class StatusBarController: NSObject {
             add(details?.fiveHourUsage, priority: .hourly)
         case .tavilySearch, .braveSearch:
             add(details?.mcpUsagePercent, priority: .monthly)
-        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek:
+        case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .dashScope:
             break
         }
 
@@ -3186,6 +3186,8 @@ final class StatusBarController: NSObject {
         case .braveSearch:
             image = NSImage(named: "BraveSearchIcon")
         case .deepSeek:
+            image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
+        case .dashScope:
             image = NSImage(systemSymbolName: identifier.iconName, accessibilityDescription: identifier.displayName)
         }
 
