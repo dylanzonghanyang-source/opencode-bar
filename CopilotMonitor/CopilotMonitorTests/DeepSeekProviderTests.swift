@@ -256,7 +256,8 @@ final class DeepSeekProviderTests: XCTestCase {
         XCTAssertEqual(rendered, ["Balance: ¥103.49", "Topped-up: ¥103.49", "Granted: ¥0.00"])
     }
 
-    /// Unified two-column PAYG metric row must include Granted and Topped-up.
+    /// Unified two-column PAYG metric row: only primary Balance in main
+    /// PAYGO section (Granted/Topped-up belong in detail submenu).
     @MainActor
     func testDeepSeekPayAsYouGoMetricRows() {
         let details = DetailedUsage(
@@ -273,10 +274,8 @@ final class DeepSeekProviderTests: XCTestCase {
             balanceGranted: details.balanceGranted,
             balanceToppedUp: details.balanceToppedUp
         )
-        XCTAssertEqual(rows.map(\.label), ["Balance", "Granted", "Topped-up"])
+        XCTAssertEqual(rows.map(\.label), ["Balance"])
         XCTAssertEqual(rows[0].value, "¥103.49 left")
-        XCTAssertEqual(rows[1].value, "¥0.00 left")
-        XCTAssertEqual(rows[2].value, "¥103.49 left")
     }
 
 }

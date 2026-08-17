@@ -53,7 +53,8 @@ enum MenuQuotaWindowBuilder {
         }
     }
 
-    /// PAYG-style rows: a single Balance/Spent row plus optional Granted/Topped-up details.
+    /// PAYG-style rows: primary Balance/Spent row only.
+    /// Granted/Topped-up details belong in the detail submenu, not the main PAYGO section.
     static func payAsYouGoMetricRows(
         creditsBalance: Double?,
         creditsRemaining: Double?,
@@ -68,14 +69,7 @@ enum MenuQuotaWindowBuilder {
             cost: cost,
             currencySymbol: currencySymbol
         )
-        var rows = [primary]
-        if let granted = balanceGranted, granted > 0 {
-            rows.append(MetricRow(label: "Granted", value: MenuDisplayFormatter.leftAmountText(symbol: currencySymbol, amount: granted)))
-        }
-        if let toppedUp = balanceToppedUp, toppedUp > 0 {
-            rows.append(MetricRow(label: "Topped-up", value: MenuDisplayFormatter.leftAmountText(symbol: currencySymbol, amount: toppedUp)))
-        }
-        return rows
+        return [primary]
     }
 
     static func windows(
@@ -2293,7 +2287,7 @@ final class StatusBarController: NSObject {
         insertIndex += 1
 
         let payAsYouGoHeader = NSMenuItem()
-        payAsYouGoHeader.view = createHeaderView(title: "PAYG")
+        payAsYouGoHeader.view = createHeaderView(title: "PAYGO")
         payAsYouGoHeader.tag = 999
         menu.insertItem(payAsYouGoHeader, at: insertIndex)
         insertIndex += 1

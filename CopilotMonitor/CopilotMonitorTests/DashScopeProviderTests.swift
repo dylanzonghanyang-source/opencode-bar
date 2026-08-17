@@ -165,7 +165,8 @@ final class DashScopeProviderTests: XCTestCase {
     }
 
     /// The new unified two-column metric row must surface balance as the
-    /// primary PAYG child row under a provider parent.
+    /// primary PAYG child row under a provider parent (granted/topped-up
+    /// belong in the detail submenu, not the main PAYGO section).
     @MainActor
     func testDashScopePayAsYouGoMetricRows() {
         let details = DetailedUsage(
@@ -182,10 +183,8 @@ final class DashScopeProviderTests: XCTestCase {
             balanceGranted: details.balanceGranted,
             balanceToppedUp: details.balanceToppedUp
         )
-        XCTAssertEqual(rows.map(\.label), ["Balance", "Granted", "Topped-up"])
+        XCTAssertEqual(rows.map(\.label), ["Balance"])
         XCTAssertEqual(rows[0].value, "¥50.00 left")
-        XCTAssertEqual(rows[1].value, "¥0.00 left")
-        XCTAssertEqual(rows[2].value, "¥50.00 left")
     }
 
     // MARK: - Error paths
