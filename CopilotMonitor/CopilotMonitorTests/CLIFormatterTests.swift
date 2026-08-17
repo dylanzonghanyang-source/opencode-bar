@@ -570,6 +570,19 @@ final class CLIFormatterTests: XCTestCase {
         XCTAssertEqual(text, "$5.67 spent")
     }
 
+    /// TIMICC legacy semantics: creditsBalance AND cost both carry the balance.
+    /// The generic formatter must prefer the balance so the row reads "left",
+    /// never "$53.46 spent" (no provider-specific branch required).
+    func testPayAsYouGoAmountTextBalanceTakesPriorityOverLegacyCost() {
+        let text = MenuDisplayFormatter.payAsYouGoAmountText(
+            creditsBalance: 53.46,
+            creditsRemaining: nil,
+            cost: 53.46,
+            currencySymbol: "$"
+        )
+        XCTAssertEqual(text, "$53.46 left")
+    }
+
     /// Empty currency symbol falls back to "$" for balance-style providers.
     func testPayAsYouGoAmountTextDefaultCurrency() {
         let text = MenuDisplayFormatter.payAsYouGoAmountText(
