@@ -82,7 +82,10 @@ final class DashScopeProviderTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "x-xsrf-token"), "fake-csrf-token")
             XCTAssertEqual(request.value(forHTTPHeaderField: "x-csrf-token"), "fake-csrf-token")
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-Requested-With"), "XMLHttpRequest")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), providerCookieHeader)
+            XCTAssertEqual(
+                request.value(forHTTPHeaderField: "Cookie"),
+                "login_aliyunid_csrf=fake-csrf-token; login_aliyunid_ticket=fake-ticket; cna=fake-cna"
+            )
             let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
             let query = Dictionary(uniqueKeysWithValues: components.queryItems?.map { ($0.name, $0.value ?? "") } ?? [])
             XCTAssertEqual(query["action"], "QueryAccountBalance")
@@ -99,9 +102,6 @@ final class DashScopeProviderTests: XCTestCase {
         }
         return provider
     }
-
-    private let providerCookieHeader =
-        "login_aliyunid_csrf=fake-csrf-token; login_aliyunid_ticket=fake-ticket; cna=fake-cna"
 
     private let userInfoBody = #"{"code":"200","data":{"secToken":"fake-sec-token"}}"#
     private let balanceBody = """
@@ -153,11 +153,12 @@ final class DashScopeProviderTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testFetchBalanceRendersBalanceRow() async throws {
         let provider = makeProvider(userInfoBody: userInfoBody, balanceBody: balanceBody)
         let result = try await provider.fetch()
         let details = try XCTUnwrap(result.details)
-        let rows = ProviderMenuBuilder.dashScopeBalanceRows(details: details)
+        let rows = StatusBarController.dashScopeBalanceRows(details: details)
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].label, "Account Balance")
         XCTAssertEqual(rows[0].value, 50.00, accuracy: 0.001)
