@@ -210,9 +210,9 @@ final class XaiSuperGrokProvider: ProviderProtocol {
             // Period type omitted but currentPeriod is otherwise valid (observed in some xAI responses).
             // Use the generic MCP/active-quota slot so the value is visible without mislabeling it.
             details = DetailedUsage(
+                authSource: authSource,
                 mcpUsagePercent: usedPercent,
-                mcpUsageReset: resetDate,
-                authSource: authSource
+                mcpUsageReset: resetDate
             )
         default:
             logger.error("xAI SuperGrok unknown period type: \(periodType, privacy: .public)")
