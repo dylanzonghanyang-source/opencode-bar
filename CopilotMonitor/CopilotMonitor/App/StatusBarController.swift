@@ -2037,7 +2037,8 @@ final class StatusBarController: NSObject {
             .nanoGpt,
             .antigravity,
             .chutes,
-            .synthetic
+            .synthetic,
+            .xaiSuperGrok
         ]
         for identifier in quotaOrder {
             guard isProviderEnabled(identifier) else { continue }
