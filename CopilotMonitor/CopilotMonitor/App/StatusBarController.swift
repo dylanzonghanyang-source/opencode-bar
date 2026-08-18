@@ -113,11 +113,11 @@ enum MenuQuotaWindowBuilder {
                 window("API", details?.cursorApiUsage)
             ])
         case .xaiSuperGrok:
-            // Single active SuperGrok window derived from DetailedUsage mapping.
             windows = compactWindows([
                 window("Weekly", details?.sevenDayUsage),
                 window("Monthly", details?.monthlyUsage),
-                window("Daily", details?.dailyUsage)
+                window("Daily", details?.dailyUsage),
+                window("Usage", details?.mcpUsagePercent)
             ])
         default:
             windows = []
@@ -1236,6 +1236,7 @@ final class StatusBarController: NSObject {
             add(details?.sevenDayUsage, priority: .weekly)
             add(details?.monthlyUsage, priority: .monthly)
             add(details?.dailyUsage, priority: .daily)
+            add(details?.mcpUsagePercent, priority: .fallback)
         case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .dashScope, .timicc:
             break
         }

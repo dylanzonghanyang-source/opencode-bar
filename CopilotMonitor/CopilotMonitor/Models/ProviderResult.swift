@@ -1236,6 +1236,9 @@ struct TableFormatter {
                 if let daily = result.details?.dailyUsage {
                     return UsagePercentDisplayFormatter.string(from: daily)
                 }
+                if let generic = result.details?.mcpUsagePercent {
+                    return UsagePercentDisplayFormatter.string(from: generic)
+                }
             }
             // Z.AI: show token/MCP/weekly window percentages when available
             if identifier == .zaiCodingPlan {

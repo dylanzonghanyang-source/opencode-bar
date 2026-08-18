@@ -200,19 +200,23 @@ final class XaiSuperGrokProvider: ProviderProtocol {
                 primaryReset: resetDate,
                 authSource: authSource
             )
-        case "USAGE_PERIOD_TYPE_WEEKLY", "":
-            // Default / unknown period types map to the observed SuperGrok weekly window.
+        case "USAGE_PERIOD_TYPE_WEEKLY":
             details = DetailedUsage(
                 sevenDayUsage: usedPercent,
                 sevenDayReset: resetDate,
+                authSource: authSource
+            )
+        case "":
+            // Period type omitted but currentPeriod is otherwise valid (observed in some xAI responses).
+            // Use the generic MCP/active-quota slot so the value is visible without mislabeling it.
+            details = DetailedUsage(
+                mcpUsagePercent: usedPercent,
+                mcpUsageReset: resetDate,
                 authSource: authSource
             )
         default:
-            details = DetailedUsage(
-                sevenDayUsage: usedPercent,
-                sevenDayReset: resetDate,
-                authSource: authSource
-            )
+            logger.error("xAI SuperGrok unknown period type: \(periodType, privacy: .public)")
+            throw ProviderError.decodingError("Unknown xAI quota period type")
         }
 
         logger.info(
@@ -252,7 +256,7 @@ final class XaiSuperGrokProvider: ProviderProtocol {
         case "USAGE_PERIOD_TYPE_WEEKLY":
             return "Weekly"
         default:
-            return "Weekly"
+            return "Usage"
         }
     }
 }

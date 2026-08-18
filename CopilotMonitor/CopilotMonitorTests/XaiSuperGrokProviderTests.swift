@@ -330,6 +330,105 @@ final class XaiSuperGrokProviderTests: XCTestCase {
         XCTAssertEqual(rows.first?.value, "12% used")
     }
 
+    func testDailyPeriodMapsToDailyUsage() async throws {
+        let body = """
+        {
+          "config": {
+            "currentPeriod": {
+              "type": "USAGE_PERIOD_TYPE_DAILY",
+              "end": "2026-07-20T02:24:00.983423+00:00"
+            },
+            "creditUsagePercent": 18
+          }
+        }
+        """
+        let result = try await makeProvider(body: body).fetch()
+        let details = try XCTUnwrap(result.details)
+        XCTAssertEqual(details.dailyUsage, 18)
+        XCTAssertNil(details.sevenDayUsage)
+        XCTAssertNil(details.monthlyUsage)
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .xaiSuperGrok,
+            primaryUsage: result.usage.usagePercentage,
+            details: details
+        )
+        XCTAssertEqual(windows.count, 1)
+        XCTAssertEqual(windows[0].label, "Daily")
+        XCTAssertEqual(windows[0].usedPercent, 18)
+
+        let rows = MenuQuotaWindowBuilder.quotaMetricRows(
+            for: .xaiSuperGrok,
+            primaryUsage: result.usage.usagePercentage,
+            details: details
+        )
+        XCTAssertEqual(rows.first?.label, "Daily")
+        XCTAssertEqual(rows.first?.value, "18% used")
+    }
+
+    func testUnknownPeriodTypeIsNotLabeledWeekly() async {
+        let body = """
+        {
+          "config": {
+            "currentPeriod": {
+              "type": "USAGE_PERIOD_TYPE_YEARLY",
+              "end": "2026-12-31T00:00:00Z"
+            },
+            "creditUsagePercent": 30
+          }
+        }
+        """
+
+        do {
+            _ = try await makeProvider(body: body).fetch()
+            XCTFail("expected decoding error for unknown period type")
+        } catch let error as ProviderError {
+            guard case .decodingError = error else {
+                return XCTFail("expected decodingError, got \\(error)")
+            }
+        } catch {
+            XCTFail("unexpected error \\(error)")
+        }
+    }
+
+    func testEmptyPeriodTypeMapsToGenericUsage() async throws {
+        let body = """
+        {
+          "config": {
+            "currentPeriod": {
+              "type": "",
+              "end": "2026-07-20T02:24:00.983423+00:00"
+            },
+            "creditUsagePercent": 7
+          }
+        }
+        """
+
+        let result = try await makeProvider(body: body).fetch()
+        let details = try XCTUnwrap(result.details)
+        XCTAssertNil(details.sevenDayUsage)
+        XCTAssertNil(details.monthlyUsage)
+        XCTAssertNil(details.dailyUsage)
+        XCTAssertEqual(details.mcpUsagePercent, 7)
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .xaiSuperGrok,
+            primaryUsage: result.usage.usagePercentage,
+            details: details
+        )
+        XCTAssertEqual(windows.count, 1)
+        XCTAssertEqual(windows[0].label, "Usage")
+        XCTAssertEqual(windows[0].usedPercent, 7)
+
+        let rows = MenuQuotaWindowBuilder.quotaMetricRows(
+            for: .xaiSuperGrok,
+            primaryUsage: result.usage.usagePercentage,
+            details: details
+        )
+        XCTAssertEqual(rows.first?.label, "Usage")
+        XCTAssertEqual(rows.first?.value, "7% used")
+    }
+
     // MARK: - Menu hierarchy / status-bar candidates
 
     func testMenuHierarchyParentHasNoPercent() {

@@ -1000,6 +1000,15 @@ extension StatusBarController {
                 )
                 items.forEach { submenu.addItem($0) }
             }
+            if let generic = details.mcpUsagePercent {
+                let items = createUsageWindowRow(
+                    label: "Usage",
+                    usagePercent: generic,
+                    resetDate: details.mcpUsageReset,
+                    windowHours: 24 * 7
+                )
+                items.forEach { submenu.addItem($0) }
+            }
 
         default:
             break
