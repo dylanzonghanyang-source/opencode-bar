@@ -198,6 +198,7 @@ struct ProviderSubscriptionPresets {
     static let deepSeek: [SubscriptionPreset] = []
     static let dashScope: [SubscriptionPreset] = []
     static let timicc: [SubscriptionPreset] = []
+    static let xaiSuperGrok: [SubscriptionPreset] = []
 
     static func presets(for provider: ProviderIdentifier) -> [SubscriptionPreset] {
         switch provider {
@@ -249,6 +250,8 @@ struct ProviderSubscriptionPresets {
             return dashScope
         case .timicc:
             return timicc
+        case .xaiSuperGrok:
+            return xaiSuperGrok
         }
     }
 }

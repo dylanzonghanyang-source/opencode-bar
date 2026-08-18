@@ -112,6 +112,13 @@ enum MenuQuotaWindowBuilder {
                 window("Auto", details?.cursorAutoUsage),
                 window("API", details?.cursorApiUsage)
             ])
+        case .xaiSuperGrok:
+            // Single active SuperGrok window derived from DetailedUsage mapping.
+            windows = compactWindows([
+                window("Weekly", details?.sevenDayUsage),
+                window("Monthly", details?.monthlyUsage),
+                window("Daily", details?.dailyUsage)
+            ])
         default:
             windows = []
         }
@@ -1225,6 +1232,10 @@ final class StatusBarController: NSObject {
             add(details?.fiveHourUsage, priority: .hourly)
         case .tavilySearch, .braveSearch:
             add(details?.mcpUsagePercent, priority: .monthly)
+        case .xaiSuperGrok:
+            add(details?.sevenDayUsage, priority: .weekly)
+            add(details?.monthlyUsage, priority: .monthly)
+            add(details?.dailyUsage, priority: .daily)
         case .antigravity, .geminiCLI, .openRouter, .openCode, .openCodeZen, .deepSeek, .dashScope, .timicc:
             break
         }
@@ -1319,7 +1330,9 @@ final class StatusBarController: NSObject {
                     details.tokenUsagePercent,
                     details.mcpUsagePercent,
                     details.weeklyUsagePercent,
-                    details.openCodeGoMonthlyUsage
+                    details.openCodeGoMonthlyUsage,
+                    details.dailyUsage,
+                    details.monthlyUsage
                 ]
                 for percent in extraPercents {
                     if let normalized = Self.normalizedUsagePercent(percent) {
@@ -3350,6 +3363,8 @@ final class StatusBarController: NSObject {
             image = NSImage(systemSymbolName: ProviderIdentifier.dashScope.iconName, accessibilityDescription: identifier.displayName)
         case .timicc:
             image = NSImage(systemSymbolName: ProviderIdentifier.timicc.iconName, accessibilityDescription: identifier.displayName)
+        case .xaiSuperGrok:
+            image = NSImage(named: "GrokIcon")
         }
 
          // Keep consistent icon sizing and make Gemini slightly larger.

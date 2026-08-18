@@ -972,11 +972,41 @@ extension StatusBarController {
             addSubscriptionItems(to: submenu, provider: .kiro, accountId: subscriptionAccountId)
             debugLog("createDetailSubmenu: added subscription items for Kiro")
 
+        case .xaiSuperGrok:
+            if let weekly = details.sevenDayUsage {
+                let items = createUsageWindowRow(
+                    label: "Weekly",
+                    usagePercent: weekly,
+                    resetDate: details.sevenDayReset,
+                    windowHours: 24 * 7
+                )
+                items.forEach { submenu.addItem($0) }
+            }
+            if let monthly = details.monthlyUsage {
+                let items = createUsageWindowRow(
+                    label: "Monthly",
+                    usagePercent: monthly,
+                    resetDate: details.primaryReset,
+                    isMonthly: true
+                )
+                items.forEach { submenu.addItem($0) }
+            }
+            if let daily = details.dailyUsage {
+                let items = createUsageWindowRow(
+                    label: "Daily",
+                    usagePercent: daily,
+                    resetDate: details.primaryReset,
+                    windowHours: 24
+                )
+                items.forEach { submenu.addItem($0) }
+            }
+
         default:
             break
         }
 
-        if let daily = details.dailyUsage {
+        // SuperGrok stores USED percent in dailyUsage; do not render it as a $ amount.
+        if let daily = details.dailyUsage, identifier != .xaiSuperGrok {
             let item = NSMenuItem()
             item.view = createDisabledLabelView(
                 text: String(format: "Daily: $%.2f", daily),
@@ -994,7 +1024,7 @@ extension StatusBarController {
             submenu.addItem(item)
         }
 
-        if let monthly = details.monthlyUsage, identifier != .grok {
+        if let monthly = details.monthlyUsage, identifier != .grok, identifier != .xaiSuperGrok {
             let item = NSMenuItem()
             item.view = createDisabledLabelView(
                 text: String(format: "Monthly: $%.2f", monthly),

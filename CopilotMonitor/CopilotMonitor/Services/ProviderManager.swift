@@ -49,7 +49,8 @@ actor ProviderManager {
             BraveSearchProvider(),
             DeepSeekProvider(),
             DashScopeProvider(),
-            TimiccProvider()
+            TimiccProvider(),
+            XaiSuperGrokProvider()
         ]
     }
 

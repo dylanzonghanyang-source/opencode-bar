@@ -34,6 +34,7 @@ enum ProviderIdentifier: String, CaseIterable {
     case deepSeek = "deepseek"
     case dashScope = "dashscope"
     case timicc
+    case xaiSuperGrok = "xai_supergrok"
     var displayName: String {
         switch self {
         case .copilot:
@@ -84,6 +85,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "Alibaba Cloud (DashScope)"
         case .timicc:
             return "Timicc"
+        case .xaiSuperGrok:
+            return "xAI SuperGrok"
         }
     }
 
@@ -137,6 +140,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "DashScope"
         case .timicc:
             return "Timicc"
+        case .xaiSuperGrok:
+            return "SuperGrok"
         }
     }
 
@@ -190,6 +195,8 @@ enum ProviderIdentifier: String, CaseIterable {
             return "yensign.circle"
         case .timicc:
             return "t.circle"
+        case .xaiSuperGrok:
+            return "GrokIcon"
         }
     }
 }

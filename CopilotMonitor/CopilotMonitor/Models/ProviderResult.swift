@@ -1226,6 +1226,17 @@ struct TableFormatter {
             if identifier == .grok, let monthlyUsage = result.details?.monthlyUsage {
                 return UsagePercentDisplayFormatter.string(from: monthlyUsage)
             }
+            if identifier == .xaiSuperGrok {
+                if let weekly = result.details?.sevenDayUsage {
+                    return UsagePercentDisplayFormatter.string(from: weekly)
+                }
+                if let monthly = result.details?.monthlyUsage {
+                    return UsagePercentDisplayFormatter.string(from: monthly)
+                }
+                if let daily = result.details?.dailyUsage {
+                    return UsagePercentDisplayFormatter.string(from: daily)
+                }
+            }
             // Z.AI: show token/MCP/weekly window percentages when available
             if identifier == .zaiCodingPlan {
                 let percents = [

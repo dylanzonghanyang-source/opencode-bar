@@ -227,9 +227,11 @@ struct OpenCodeAuth: Codable {
     let nanoGpt: APIKey?
     let synthetic: APIKey?
     let chutes: APIKey?
+    /// OpenCode xAI OAuth entry (`"xai"`). Used by SuperGrok quota monitoring only.
+    let xai: OAuth?
 
     enum CodingKeys: String, CodingKey {
-        case anthropic, openai, openrouter, opencode, synthetic, chutes, deepseek, timicc
+        case anthropic, openai, openrouter, opencode, synthetic, chutes, deepseek, timicc, xai
         case openCodeGo = "opencode-go"
         case githubCopilot = "github-copilot"
         case kimiForCoding = "kimi-for-coding"
@@ -253,7 +255,8 @@ struct OpenCodeAuth: Codable {
         zaiCodingPlan: APIKey?,
         nanoGpt: APIKey?,
         synthetic: APIKey?,
-        chutes: APIKey? = nil
+        chutes: APIKey? = nil,
+        xai: OAuth? = nil
     ) {
         self.anthropic = anthropic
         self.openai = openai
@@ -270,6 +273,7 @@ struct OpenCodeAuth: Codable {
         self.nanoGpt = nanoGpt
         self.synthetic = synthetic
         self.chutes = chutes
+        self.xai = xai
     }
 
     init(from decoder: Decoder) throws {
@@ -292,6 +296,7 @@ struct OpenCodeAuth: Codable {
         nanoGpt = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .nanoGpt)
         synthetic = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .synthetic)
         chutes = Self.decodeLossyIfPresent(APIKey.self, from: container, forKey: .chutes)
+        xai = Self.decodeLossyIfPresent(OAuth.self, from: container, forKey: .xai)
 
         if anthropic == nil,
            openai == nil,
@@ -307,7 +312,8 @@ struct OpenCodeAuth: Codable {
            zaiCodingPlan == nil,
            nanoGpt == nil,
            synthetic == nil,
-           chutes == nil {
+           chutes == nil,
+           xai == nil {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: container.codingPath,
@@ -347,6 +353,7 @@ struct OpenCodeAuth: Codable {
         try container.encodeIfPresent(nanoGpt, forKey: .nanoGpt)
         try container.encodeIfPresent(synthetic, forKey: .synthetic)
         try container.encodeIfPresent(chutes, forKey: .chutes)
+        try container.encodeIfPresent(xai, forKey: .xai)
     }
 }
 
@@ -4025,6 +4032,26 @@ final class TokenManager: @unchecked Sendable {
             return access
         }
         return getClaudeAccounts().first?.accessToken
+    }
+
+    /// Reads the OpenCode `xai` OAuth entry as a credential snapshot.
+    /// OpenCode owns refresh; callers must treat this as read-only and must not
+    /// use the refresh token or write auth.json.
+    func getXaiOAuthCredential() -> XaiOAuthCredential? {
+        guard let auth = readOpenCodeAuth(), let oauth = auth.xai else {
+            return nil
+        }
+        let access = oauth.access.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !access.isEmpty else { return nil }
+
+        let expiresAt: Date?
+        if oauth.expires > 0 {
+            expiresAt = dateFromEpoch(oauth.expires)
+        } else {
+            // Missing / zero expiry is treated as unknown (token may still work).
+            expiresAt = nil
+        }
+        return XaiOAuthCredential(accessToken: access, expiresAt: expiresAt)
     }
 
     /// Gets OpenAI access token, first from OpenCode auth, then falling back to Codex CLI native auth (~/.codex/auth.json)

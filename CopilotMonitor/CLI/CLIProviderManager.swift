@@ -20,7 +20,8 @@ actor CLIProviderManager {
         .synthetic,
         .deepSeek,
         .dashScope,
-        .timicc
+        .timicc,
+        .xaiSuperGrok
     ]
     
     // MARK: - Initialization
@@ -48,6 +49,7 @@ actor CLIProviderManager {
         let deepSeekProvider = DeepSeekProvider()
         let dashScopeProvider = DashScopeProvider()
         let timiccProvider = TimiccProvider()
+        let xaiSuperGrokProvider = XaiSuperGrokProvider()
 
         // 1 CLI-specific provider (uses browser cookies instead of WebView)
         let copilotCLIProvider = CopilotCLIProvider()
@@ -73,7 +75,8 @@ actor CLIProviderManager {
             syntheticProvider,
             deepSeekProvider,
             dashScopeProvider,
-            timiccProvider
+            timiccProvider,
+            xaiSuperGrokProvider
         ]
 
         let providerCount = providers.count
