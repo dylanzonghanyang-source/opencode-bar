@@ -427,19 +427,38 @@ extension StatusBarController {
             addSubscriptionItems(to: submenu, provider: .codex, accountId: subscriptionAccountId)
 
         case .commandCode:
-            if let total = details.creditsTotal,
-               total > 0,
-               let remaining = details.creditsRemaining {
-                let usagePercent = max(0, min(((total - remaining) / total) * 100.0, 999.0))
+            // === Usage Windows ===
+            if let fiveHour = details.fiveHourUsage {
+                createUsageWindowRow(
+                    label: "5h",
+                    usagePercent: fiveHour,
+                    resetDate: details.fiveHourReset,
+                    windowHours: 5
+                ).forEach { submenu.addItem($0) }
+            }
+            if let weekly = details.sevenDayUsage {
+                if details.fiveHourUsage != nil { submenu.addItem(NSMenuItem.separator()) }
+                createUsageWindowRow(
+                    label: "Weekly",
+                    usagePercent: weekly,
+                    resetDate: details.sevenDayReset,
+                    windowHours: 168
+                ).forEach { submenu.addItem($0) }
+            }
+            if let monthly = details.monthlyUsage {
+                if details.fiveHourUsage != nil || details.sevenDayUsage != nil {
+                    submenu.addItem(NSMenuItem.separator())
+                }
                 createUsageWindowRow(
                     label: "Monthly Credits",
-                    usagePercent: usagePercent,
+                    usagePercent: monthly,
                     resetDate: details.primaryReset,
                     isMonthly: true
                 ).forEach { submenu.addItem($0) }
             }
 
-            if details.planType != nil || details.creditsTotal != nil || details.creditsRemaining != nil {
+            // === Account Details ===
+            if details.fiveHourUsage != nil || details.sevenDayUsage != nil || details.monthlyUsage != nil {
                 submenu.addItem(NSMenuItem.separator())
             }
 
@@ -452,21 +471,21 @@ extension StatusBarController {
                 submenu.addItem(item)
             }
 
-            if let used = details.monthlyCost, let total = details.creditsTotal {
+            if let remaining = details.creditsRemaining,
+               let total = details.creditsTotal, total > 0 {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Monthly Used: $%.2f / $%.2f", used, total))
-                submenu.addItem(item)
-            }
-
-            if let remaining = details.creditsRemaining {
-                let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Credits Left: $%.2f", remaining))
+                item.view = createDisabledLabelView(
+                    text: String(format: "Monthly Credits: $%.2f / $%.2f", remaining, total)
+                )
                 submenu.addItem(item)
             }
 
             if let purchasedCredits = details.creditsBalance, purchasedCredits > 0 {
                 let item = NSMenuItem()
-                item.view = createDisabledLabelView(text: String(format: "Purchased Credits: $%.2f", purchasedCredits))
+                item.view = createDisabledLabelView(
+                    text: String(format: "Purchased Credits: $%.2f", purchasedCredits),
+                    icon: NSImage(systemSymbolName: "wallet.bifold", accessibilityDescription: "Purchased Credits")
+                )
                 submenu.addItem(item)
             }
 
@@ -1277,6 +1296,14 @@ extension StatusBarController {
 
     func createGeminiAccountSubmenu(_ account: GeminiAccountQuota) -> NSMenu {
         let submenu = NSMenu()
+
+        let scopeItem = NSMenuItem()
+        scopeItem.view = createDisabledLabelView(
+            text: "Quota: Gemini CLI / Code Assist (not Gemini Apps web)",
+            icon: NSImage(systemSymbolName: "info.circle", accessibilityDescription: "Quota scope"),
+            multiline: true
+        )
+        submenu.addItem(scopeItem)
 
         addGroupedModelUsageSection(
             to: submenu,

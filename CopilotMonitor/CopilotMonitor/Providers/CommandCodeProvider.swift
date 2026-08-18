@@ -12,6 +12,7 @@ struct CommandCodePlan: Equatable {
 enum CommandCodePlanCatalog {
     private static let displayOrder = [
         "individual-go",
+        "individual-goat",
         "individual-pro",
         "individual-max",
         "individual-ultra"
@@ -19,6 +20,7 @@ enum CommandCodePlanCatalog {
 
     static let plans: [String: CommandCodePlan] = [
         "individual-go": CommandCodePlan(id: "individual-go", displayName: "Go", monthlyCreditsUSD: 10),
+        "individual-goat": CommandCodePlan(id: "individual-goat", displayName: "GOAT", monthlyCreditsUSD: 70),
         "individual-pro": CommandCodePlan(id: "individual-pro", displayName: "Pro", monthlyCreditsUSD: 30),
         "individual-max": CommandCodePlan(id: "individual-max", displayName: "Max", monthlyCreditsUSD: 150),
         "individual-ultra": CommandCodePlan(id: "individual-ultra", displayName: "Ultra", monthlyCreditsUSD: 300)
@@ -94,6 +96,17 @@ enum CommandCodeProviderError: LocalizedError {
     }
 }
 
+struct CommandCodeRollingWindow: Equatable {
+    let cap: Double
+    let used: Double
+    let resetAt: Date?
+
+    var usagePercent: Double {
+        guard cap > 0, cap.isFinite, used.isFinite else { return 0 }
+        return min(max((used / cap) * 100.0, 0), 999)
+    }
+}
+
 struct CommandCodeUsageSnapshot: Equatable {
     let monthlyCreditsRemaining: Double
     let purchasedCredits: Double
@@ -101,6 +114,28 @@ struct CommandCodeUsageSnapshot: Equatable {
     let billingPeriodEnd: Date?
     let subscriptionStatus: String?
     let authSource: String
+    let fiveHourWindow: CommandCodeRollingWindow?
+    let weeklyWindow: CommandCodeRollingWindow?
+
+    init(
+        monthlyCreditsRemaining: Double,
+        purchasedCredits: Double,
+        plan: CommandCodePlan?,
+        billingPeriodEnd: Date?,
+        subscriptionStatus: String?,
+        authSource: String,
+        fiveHourWindow: CommandCodeRollingWindow? = nil,
+        weeklyWindow: CommandCodeRollingWindow? = nil
+    ) {
+        self.monthlyCreditsRemaining = monthlyCreditsRemaining
+        self.purchasedCredits = purchasedCredits
+        self.plan = plan
+        self.billingPeriodEnd = billingPeriodEnd
+        self.subscriptionStatus = subscriptionStatus
+        self.authSource = authSource
+        self.fiveHourWindow = fiveHourWindow
+        self.weeklyWindow = weeklyWindow
+    }
 
     var monthlyCreditsTotal: Double? { plan?.monthlyCreditsUSD }
 
@@ -187,8 +222,14 @@ final class CommandCodeProvider: ProviderProtocol {
         let remainingUSD = snapshot.monthlyCreditsRemaining
         let entitlementCents = max(Int((totalUSD * 100.0).rounded()), 1)
         let remainingCents = Int((remainingUSD * 100.0).rounded())
+        let monthlyUsage = snapshot.monthlyCreditsTotal == nil ? nil : snapshot.usagePercent
 
         let details = DetailedUsage(
+            monthlyUsage: monthlyUsage,
+            fiveHourUsage: snapshot.fiveHourWindow?.usagePercent,
+            fiveHourReset: snapshot.fiveHourWindow?.resetAt,
+            sevenDayUsage: snapshot.weeklyWindow?.usagePercent,
+            sevenDayReset: snapshot.weeklyWindow?.resetAt,
             primaryReset: snapshot.billingPeriodEnd,
             creditsBalance: snapshot.purchasedCredits,
             planType: snapshot.plan?.displayName ?? snapshot.subscriptionStatus,
@@ -249,7 +290,9 @@ final class CommandCodeProvider: ProviderProtocol {
             plan: plan,
             billingPeriodEnd: subscription.currentPeriodEnd,
             subscriptionStatus: subscription.status,
-            authSource: authSource
+            authSource: authSource,
+            fiveHourWindow: credits.fiveHourWindow,
+            weeklyWindow: credits.weeklyWindow
         )
     }
 
@@ -405,6 +448,8 @@ final class CommandCodeProvider: ProviderProtocol {
     private struct CreditsPayload {
         let monthlyCredits: Double
         let purchasedCredits: Double
+        let fiveHourWindow: CommandCodeRollingWindow?
+        let weeklyWindow: CommandCodeRollingWindow?
     }
 
     private struct SubscriptionPayload {
@@ -413,15 +458,42 @@ final class CommandCodeProvider: ProviderProtocol {
         let currentPeriodEnd: Date?
     }
 
+    private static func parseRollingWindow(_ value: Any?) -> CommandCodeRollingWindow? {
+        guard let window = value as? [String: Any] else { return nil }
+        let cap = APIValueParser.parseDouble(from: window, keys: ["cap"])
+        guard cap > 0, cap.isFinite else { return nil }
+        let used = APIValueParser.parseDouble(from: window, keys: ["used"])
+        let resetAt: Date? = {
+            if let raw = window["resetAt"] {
+                if let ms = raw as? NSNumber, ms.doubleValue > 10_000_000_000 {
+                    return Date(timeIntervalSince1970: ms.doubleValue / 1000.0)
+                }
+                if let ts = raw as? Double, ts > 10_000_000_000 {
+                    return Date(timeIntervalSince1970: ts / 1000.0)
+                }
+                if let s = raw as? String, let date = APIValueParser.parseDate(from: s) {
+                    return date
+                }
+            }
+            return nil
+        }()
+        return CommandCodeRollingWindow(cap: cap, used: used, resetAt: resetAt)
+    }
+
     private static func parseCreditsPayload(_ data: Data) throws -> CreditsPayload {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let credits = root["credits"] as? [String: Any] else {
             throw CommandCodeProviderError.parseFailed("Missing credits object")
         }
 
+        let windowLimits = (root["windowLimits"] as? [String: Any])
+            ?? (credits["windowLimits"] as? [String: Any])
+
         return CreditsPayload(
             monthlyCredits: APIValueParser.parseDouble(from: credits, keys: ["monthlyCredits"]),
-            purchasedCredits: APIValueParser.parseDouble(from: credits, keys: ["purchasedCredits"])
+            purchasedCredits: APIValueParser.parseDouble(from: credits, keys: ["purchasedCredits"]),
+            fiveHourWindow: parseRollingWindow(windowLimits?["fiveHour"]),
+            weeklyWindow: parseRollingWindow(windowLimits?["weekly"])
         )
     }
 

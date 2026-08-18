@@ -624,6 +624,67 @@ final class CLIFormatterTests: XCTestCase {
         XCTAssertEqual(windows.map(\.usedPercent), [13, 22, 34])
     }
 
+    func testGeminiCLIUsesMostConstrainedBucketAsUsedPercent() {
+        let details = DetailedUsage(
+            modelBreakdown: [
+                "gemini-2.5-flash": 95,
+                "gemini-2.5-pro": 80
+            ]
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .geminiCLI,
+            primaryUsage: nil,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["Usage"])
+        XCTAssertEqual(windows.map(\.usedPercent), [20])
+
+        let rows = MenuQuotaWindowBuilder.quotaMetricRows(
+            for: .geminiCLI,
+            primaryUsage: nil,
+            details: details
+        )
+        XCTAssertEqual(rows.map(\.label), ["Usage"])
+        XCTAssertEqual(rows.map(\.value), ["20% used"])
+    }
+
+    func testCommandCodeWindowsShowRollingAndMonthlyUsed() {
+        let details = DetailedUsage(
+            fiveHourUsage: 12,
+            sevenDayUsage: 34,
+            monthlyUsage: 56
+        )
+
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .commandCode,
+            primaryUsage: 56,
+            details: details
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["5h", "Weekly", "Monthly"])
+        XCTAssertEqual(windows.map(\.usedPercent), [12, 34, 56])
+
+        let rows = MenuQuotaWindowBuilder.quotaMetricRows(
+            for: .commandCode,
+            primaryUsage: 56,
+            details: details
+        )
+        XCTAssertEqual(rows.map(\.value), ["12% used", "34% used", "56% used"])
+    }
+
+    func testCommandCodeOmitsMissingRollingWindows() {
+        let windows = MenuQuotaWindowBuilder.windows(
+            for: .commandCode,
+            primaryUsage: 40,
+            details: DetailedUsage(monthlyUsage: 40)
+        )
+
+        XCTAssertEqual(windows.map(\.label), ["Monthly"])
+        XCTAssertEqual(windows.map(\.usedPercent), [40])
+    }
+
     func testZAIWindowsAreExplicitAndOrdered() {
         let details = DetailedUsage(
             tokenUsagePercent: 1,

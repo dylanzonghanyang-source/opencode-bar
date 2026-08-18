@@ -107,10 +107,26 @@ enum MenuQuotaWindowBuilder {
                 window("5h", details?.fiveHourUsage),
                 window("Weekly", details?.sevenDayUsage)
             ])
+        case .commandCode:
+            windows = compactWindows([
+                window("5h", details?.fiveHourUsage),
+                window("Weekly", details?.sevenDayUsage),
+                window("Monthly", details?.monthlyUsage)
+            ])
         case .cursor:
             windows = compactWindows([
                 window("Auto", details?.cursorAutoUsage),
                 window("API", details?.cursorApiUsage)
+            ])
+        case .geminiCLI:
+            // Gemini CLI / Code Assist returns REMAINING fractions. The provider
+            // converts its most constrained bucket to USED before this layer.
+            let fallbackUsedPercent = details?.modelBreakdown?.values
+                .filter { $0.isFinite }
+                .min()
+                .map { 100.0 - $0 }
+            windows = compactWindows([
+                window("Usage", primaryUsage ?? fallbackUsedPercent)
             ])
         case .xaiSuperGrok:
             windows = compactWindows([
@@ -1209,6 +1225,8 @@ final class StatusBarController: NSObject {
             )
         case .commandCode:
             add(usage.usagePercentage, priority: .monthly)
+            add(details?.sevenDayUsage, priority: .weekly)
+            add(details?.fiveHourUsage, priority: .hourly)
         case .cursor:
             add(details?.cursorAutoUsage, priority: .monthly)
             add(details?.cursorApiUsage, priority: .monthly)
@@ -2269,13 +2287,9 @@ final class StatusBarController: NSObject {
                     hasQuota = true
                     let accountNumber = account.accountIndex + 1
                     let usedPercent = Self.normalizedUsagePercent(100.0 - account.remainingPercentage) ?? 0.0
-                    // Gemini account rows should represent Gemini quota only.
                     // Antigravity has its own provider row and should not be duplicated here.
-                    let usedPercents: [Double] = [usedPercent]
-
                     let normalizedEmail = account.email.trimmingCharacters(in: .whitespacesAndNewlines)
                     var displayName = "Gemini CLI"
-
                     if !normalizedEmail.isEmpty, normalizedEmail.lowercased() != "unknown" {
                         displayName = "Gemini CLI (\(normalizedEmail))"
                     } else if geminiAccounts.count > 1, showGeminiAuthLabel {
@@ -2285,18 +2299,36 @@ final class StatusBarController: NSObject {
                     } else if geminiAccounts.count > 1 {
                         displayName = "Gemini CLI #\(accountNumber)"
                     }
-                    let item = createNativeQuotaMenuItem(
+                    let accountDetails = DetailedUsage(
+                        modelBreakdown: account.modelBreakdown,
+                        modelResetTimes: account.modelResetTimes,
+                        email: account.email,
+                        authSource: account.authSource,
+                        authUsageSummary: account.authUsageSummary
+                    )
+                    let rows = MenuQuotaWindowBuilder.quotaMetricRows(
+                        for: .geminiCLI,
+                        primaryUsage: usedPercent,
+                        details: accountDetails
+                    )
+                    let item = createProviderParentMenuItem(
                         name: displayName,
-                        usedPercents: usedPercents,
                         icon: iconForProvider(.geminiCLI),
-                        showsRemaining: true
+                        isEnabled: true
                     )
                     item.tag = 999
-
                     item.submenu = createGeminiAccountSubmenu(account)
 
                     menu.insertItem(item, at: insertIndex)
                     insertIndex += 1
+                    for row in rows {
+                        let rowItem = NSMenuItem()
+                        rowItem.view = createMetricRowView(label: row.label, value: row.value)
+                        rowItem.isEnabled = false
+                        rowItem.tag = 999
+                        menu.insertItem(rowItem, at: insertIndex)
+                        insertIndex += 1
+                    }
                 }
             } else if let errorMessage = geminiError {
                 if shouldDisplayErrorMenuItem(errorMessage) {

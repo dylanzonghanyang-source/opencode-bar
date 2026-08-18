@@ -138,6 +138,158 @@ final class CommandCodeProviderTests: XCTestCase {
         XCTAssertNotNil(snapshot.billingPeriodEnd)
     }
 
+    func testDirectAPISnapshotParsesRootWindowLimits() throws {
+        let creditsJSON = """
+        {
+            "windowLimits": {
+                "fiveHour": {
+                    "cap": 16,
+                    "used": 4,
+                    "resetAt": 1780642800000
+                },
+                "weekly": {
+                    "cap": 40,
+                    "used": 10,
+                    "resetAt": "2026-06-07T07:00:00.000Z"
+                }
+            },
+            "credits": {
+                "monthlyCredits": 8.7784,
+                "purchasedCredits": 0,
+                "premiumMonthlyCredits": 0,
+                "opensourceMonthlyCredits": 8.7784
+            }
+        }
+        """.data(using: .utf8)!
+        let subscriptionJSON = """
+        {
+            "success": true,
+            "data": {
+                "planId": "individual-go",
+                "status": "active",
+                "currentPeriodEnd": "2026-06-06T07:28:50.000Z"
+            }
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try CommandCodeProvider.snapshotFromDirectAPI(
+            creditsData: creditsJSON,
+            subscriptionData: subscriptionJSON,
+            authSource: "test"
+        )
+
+        XCTAssertEqual(snapshot.fiveHourWindow?.usagePercent, 25)
+        XCTAssertEqual(snapshot.weeklyWindow?.usagePercent, 25)
+        XCTAssertEqual(snapshot.fiveHourWindow?.resetAt?.timeIntervalSince1970, 1_780_642_800)
+        XCTAssertNotNil(snapshot.weeklyWindow?.resetAt)
+    }
+
+    func testDirectAPISnapshotFallsBackToCreditsWindowLimits() throws {
+        let creditsJSON = """
+        {
+            "credits": {
+                "monthlyCredits": 8.7784,
+                "purchasedCredits": 0,
+                "premiumMonthlyCredits": 0,
+                "opensourceMonthlyCredits": 8.7784,
+                "windowLimits": {
+                    "fiveHour": {
+                        "cap": 16,
+                        "used": 8,
+                        "resetAt": 1780642800000
+                    },
+                    "weekly": {
+                        "cap": 40,
+                        "used": 5,
+                        "resetAt": 1780642800000
+                    }
+                }
+            }
+        }
+        """.data(using: .utf8)!
+        let subscriptionJSON = """
+        {
+            "success": true,
+            "data": {
+                "planId": "individual-go",
+                "status": "active",
+                "currentPeriodEnd": "2026-06-06T07:28:50.000Z"
+            }
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try CommandCodeProvider.snapshotFromDirectAPI(
+            creditsData: creditsJSON,
+            subscriptionData: subscriptionJSON,
+            authSource: "test"
+        )
+
+        XCTAssertEqual(snapshot.fiveHourWindow?.usagePercent, 50)
+        XCTAssertEqual(snapshot.weeklyWindow?.usagePercent, 12.5, accuracy: 0.0001)
+    }
+
+    func testDirectAPISnapshotIgnoresInvalidWindowCap() throws {
+        let creditsJSON = """
+        {
+            "windowLimits": {
+                "fiveHour": {
+                    "cap": 0,
+                    "used": 4,
+                    "resetAt": 1780642800000
+                },
+                "weekly": {
+                    "used": 10,
+                    "resetAt": 1780642800000
+                }
+            },
+            "credits": {
+                "monthlyCredits": 8.7784,
+                "purchasedCredits": 0
+            }
+        }
+        """.data(using: .utf8)!
+        let subscriptionJSON = """
+        {
+            "success": true,
+            "data": {
+                "planId": "individual-go",
+                "status": "active",
+                "currentPeriodEnd": "2026-06-06T07:28:50.000Z"
+            }
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try CommandCodeProvider.snapshotFromDirectAPI(
+            creditsData: creditsJSON,
+            subscriptionData: subscriptionJSON,
+            authSource: "test"
+        )
+
+        XCTAssertNil(snapshot.fiveHourWindow)
+        XCTAssertNil(snapshot.weeklyWindow)
+    }
+
+    func testMakeResultMapsRollingWindowsAndMonthlyUsage() {
+        let snapshot = CommandCodeUsageSnapshot(
+            monthlyCreditsRemaining: 7.5,
+            purchasedCredits: 12.0,
+            plan: CommandCodePlan(id: "individual-pro", displayName: "Pro", monthlyCreditsUSD: 30),
+            billingPeriodEnd: nil,
+            subscriptionStatus: "active",
+            authSource: "test",
+            fiveHourWindow: CommandCodeRollingWindow(cap: 16, used: 8, resetAt: nil),
+            weeklyWindow: CommandCodeRollingWindow(cap: 40, used: 10, resetAt: nil)
+        )
+
+        let result = CommandCodeProvider.makeResult(from: snapshot)
+
+        XCTAssertEqual(result.details?.fiveHourUsage, 50)
+        XCTAssertEqual(result.details?.sevenDayUsage, 25)
+        XCTAssertEqual(result.details?.monthlyUsage, 75)
+        XCTAssertEqual(result.details?.creditsBalance, 12.0)
+        XCTAssertEqual(result.usage.usagePercentage, 75)
+    }
+
     func testProviderResultUsesCentPrecisionForDollarCredits() {
         let snapshot = CommandCodeUsageSnapshot(
             monthlyCreditsRemaining: 8.7784,
@@ -160,11 +312,12 @@ final class CommandCodeProviderTests: XCTestCase {
     func testCommandCodeSubscriptionPresetsUsePlanCatalog() {
         XCTAssertEqual(CommandCodePlanCatalog.orderedPlans.map(\.id), [
             "individual-go",
+            "individual-goat",
             "individual-pro",
             "individual-max",
             "individual-ultra"
         ])
-        XCTAssertEqual(ProviderSubscriptionPresets.commandCode.map(\.name), ["Go", "Pro", "Max", "Ultra"])
-        XCTAssertEqual(ProviderSubscriptionPresets.commandCode.map(\.cost), [10, 30, 150, 300])
+        XCTAssertEqual(ProviderSubscriptionPresets.commandCode.map(\.name), ["Go", "GOAT", "Pro", "Max", "Ultra"])
+        XCTAssertEqual(ProviderSubscriptionPresets.commandCode.map(\.cost), [10, 70, 30, 150, 300])
     }
 }
