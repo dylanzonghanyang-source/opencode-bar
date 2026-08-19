@@ -309,6 +309,70 @@ final class CommandCodeProviderTests: XCTestCase {
         XCTAssertEqual(result.details?.creditsTotal, 10)
     }
 
+    func testAlphaBillingPayloadParsesGoatWindowsAndIgnoresZeroReset() throws {
+        // Shape observed from GET /alpha/billing/credits with CLI API key.
+        let creditsJSON = """
+        {
+            "credits": {
+                "belowThreshold": false,
+                "creditThreshold": 1,
+                "monthlyCredits": 69.3558092723,
+                "purchasedCredits": 0,
+                "freeCredits": 0
+            },
+            "windowLimits": {
+                "limited": true,
+                "exceeded": false,
+                "fiveHour": {
+                    "used": 0,
+                    "cap": 14,
+                    "exceeded": false,
+                    "resetAt": 0
+                },
+                "weekly": {
+                    "used": 0.6441907277,
+                    "cap": 35,
+                    "exceeded": false,
+                    "resetAt": 1787626934484
+                }
+            }
+        }
+        """.data(using: .utf8)!
+        let subscriptionJSON = """
+        {
+            "success": true,
+            "data": {
+                "planId": "individual-goat",
+                "status": "active",
+                "currentPeriodEnd": "2026-09-18T02:11:00.000Z"
+            }
+        }
+        """.data(using: .utf8)!
+
+        let snapshot = try CommandCodeProvider.snapshotFromDirectAPI(
+            creditsData: creditsJSON,
+            subscriptionData: subscriptionJSON,
+            authSource: "Command Code CLI (~/.commandcode/auth.json)"
+        )
+
+        XCTAssertEqual(snapshot.plan?.displayName, "GOAT")
+        XCTAssertEqual(snapshot.monthlyCreditsTotal, 70)
+        XCTAssertEqual(snapshot.monthlyCreditsRemaining, 69.3558092723, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.fiveHourWindow?.cap, 14)
+        XCTAssertEqual(snapshot.fiveHourWindow?.used, 0)
+        XCTAssertNil(snapshot.fiveHourWindow?.resetAt)
+        XCTAssertEqual(snapshot.weeklyWindow?.usagePercent ?? 0, (0.6441907277 / 35.0) * 100.0, accuracy: 0.001)
+        XCTAssertEqual(snapshot.weeklyWindow?.resetAt?.timeIntervalSince1970, 1_787_626_934.484, accuracy: 0.001)
+        XCTAssertEqual(snapshot.purchasedCredits, 0)
+        XCTAssertEqual(snapshot.authSource, "Command Code CLI (~/.commandcode/auth.json)")
+
+        let result = CommandCodeProvider.makeResult(from: snapshot)
+        XCTAssertEqual(result.details?.fiveHourUsage, 0)
+        XCTAssertNotNil(result.details?.sevenDayUsage)
+        XCTAssertNotNil(result.details?.monthlyUsage)
+        XCTAssertEqual(result.details?.creditsBalance, 0)
+    }
+
     func testCommandCodeSubscriptionPresetsUsePlanCatalog() {
         XCTAssertEqual(CommandCodePlanCatalog.orderedPlans.map(\.id), [
             "individual-go",

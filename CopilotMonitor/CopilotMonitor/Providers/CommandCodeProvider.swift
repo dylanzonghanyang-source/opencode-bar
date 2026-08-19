@@ -85,9 +85,9 @@ enum CommandCodeProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingCredentials:
-            return "Command Code session cookie not found. Sign in to commandcode.ai or start OpenCommand."
+            return "Command Code credentials not found. Run `cmd login`, sign in to commandcode.ai, or start OpenCommand."
         case .invalidCredentials:
-            return "Command Code session cookie is invalid or expired."
+            return "Command Code credentials are invalid or expired."
         case .apiError(let status):
             return "Command Code API returned HTTP \(status)."
         case .parseFailed(let message):
@@ -179,6 +179,27 @@ final class CommandCodeProvider: ProviderProtocol {
     func fetch() async throws -> ProviderResult {
         debugLog("fetch started")
 
+        // Preferred: local CLI API key → /alpha/billing/* (browser-independent).
+        if let apiKey = loadCLIAPIKey() {
+            do {
+                let snapshot = try await fetchAlphaUsage(
+                    apiKey: apiKey,
+                    authSource: "Command Code CLI (~/.commandcode/auth.json)"
+                )
+                commandCodeLogger.info("Command Code usage fetched through CLI API key (alpha billing)")
+                debugLog("fetch completed through CLI API key alpha billing")
+                return Self.makeResult(from: snapshot)
+            } catch {
+                commandCodeLogger.warning(
+                    "CLI API key billing fetch failed: \(error.localizedDescription, privacy: .public)"
+                )
+                debugLog("CLI API key billing fetch failed: \(error.localizedDescription); trying fallbacks")
+            }
+        } else {
+            debugLog("no Command Code CLI API key found at ~/.commandcode/auth.json")
+        }
+
+        // Optional local OpenCommand proxy.
         if let proxyURL = loadOpenCommandProxyURL() {
             do {
                 try await validateOpenCommandProxy(proxyURL: proxyURL)
@@ -188,10 +209,11 @@ final class CommandCodeProvider: ProviderProtocol {
                 return Self.makeResult(from: snapshot)
             } catch {
                 commandCodeLogger.warning("OpenCommand proxy fetch failed: \(error.localizedDescription, privacy: .public)")
-                debugLog("OpenCommand proxy fetch failed: \(error.localizedDescription); falling back to direct Command Code API")
+                debugLog("OpenCommand proxy fetch failed: \(error.localizedDescription); falling back to browser session cookie")
             }
         }
 
+        // Fallback: browser / env / OpenCommand session cookie → /internal/billing/*.
         guard let credential = loadCookieHeader() else {
             debugLog("fetch failed: no Command Code credentials found")
             throw ProviderError.authenticationFailed(CommandCodeProviderError.missingCredentials.localizedDescription)
@@ -203,7 +225,7 @@ final class CommandCodeProvider: ProviderProtocol {
                 authSource: credential.authSource
             )
             commandCodeLogger.info("Command Code usage fetched through direct billing API")
-            debugLog("fetch completed through direct Command Code API")
+            debugLog("fetch completed through cookie internal billing API")
             return Self.makeResult(from: snapshot)
         } catch let error as CommandCodeProviderError {
             if case .invalidCredentials = error {
@@ -349,6 +371,44 @@ final class CommandCodeProvider: ProviderProtocol {
 
     // MARK: - Direct Command Code API
 
+    /// Browser-independent path used by official `cmd login` credentials.
+    private func fetchAlphaUsage(apiKey: String, authSource: String) async throws -> CommandCodeUsageSnapshot {
+        async let creditsTask = sendAlphaRequest(path: "/alpha/billing/credits", apiKey: apiKey)
+        async let subscriptionTask = sendAlphaRequest(path: "/alpha/billing/subscriptions", apiKey: apiKey)
+        let (creditsData, subscriptionData) = try await (creditsTask, subscriptionTask)
+        return try Self.snapshotFromDirectAPI(
+            creditsData: creditsData,
+            subscriptionData: subscriptionData,
+            authSource: authSource
+        )
+    }
+
+    private func sendAlphaRequest(path: String, apiKey: String) async throws -> Data {
+        guard let url = URL(string: "https://api.commandcode.ai\(path)") else {
+            throw CommandCodeProviderError.parseFailed("Invalid Command Code URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = fetchTimeout
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("OpenCode-Bar/CommandCodeProvider", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw CommandCodeProviderError.parseFailed("Invalid Command Code response")
+        }
+        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            throw CommandCodeProviderError.invalidCredentials
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw CommandCodeProviderError.apiError(httpResponse.statusCode)
+        }
+        return data
+    }
+
+    /// Cookie-authenticated fallback used by the website session.
     private func fetchDirectUsage(cookieHeader: String, authSource: String) async throws -> CommandCodeUsageSnapshot {
         async let creditsTask = sendDirectRequest(path: "/internal/billing/credits", cookieHeader: cookieHeader)
         async let subscriptionTask = sendDirectRequest(path: "/internal/billing/subscriptions", cookieHeader: cookieHeader)
@@ -388,6 +448,52 @@ final class CommandCodeProvider: ProviderProtocol {
             throw CommandCodeProviderError.apiError(httpResponse.statusCode)
         }
         return data
+    }
+
+    /// Read-only load of `apiKey` from `~/.commandcode/auth.json` (official `cmd login` output).
+    private func loadCLIAPIKey() -> String? {
+        if let envKey = firstNonEmptyEnvironmentValue(
+            keys: ["COMMANDCODE_API_KEY", "CC_API_KEY", "COMMAND_CODE_API_KEY"]
+        ) {
+            debugLog("Command Code API key loaded from environment")
+            return envKey
+        }
+
+        let authURL = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".commandcode", isDirectory: true)
+            .appendingPathComponent("auth.json")
+        guard fileManager.fileExists(atPath: authURL.path),
+              fileManager.isReadableFile(atPath: authURL.path) else {
+            return nil
+        }
+
+        do {
+            let data = try Data(contentsOf: authURL)
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+            for key in ["apiKey", "api_key", "key"] {
+                if let value = object[key] as? String {
+                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        debugLog("Command Code API key loaded from ~/.commandcode/auth.json")
+                        return trimmed
+                    }
+                }
+            }
+        } catch {
+            debugLog("Command Code CLI auth.json read failed: \(error.localizedDescription)")
+        }
+        return nil
+    }
+
+    private func firstNonEmptyEnvironmentValue(keys: [String]) -> String? {
+        for key in keys {
+            if let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty {
+                return value
+            }
+        }
+        return nil
     }
 
     private func loadCookieHeader() -> CommandCodeCookieCredential? {
@@ -463,21 +569,45 @@ final class CommandCodeProvider: ProviderProtocol {
         let cap = APIValueParser.parseDouble(from: window, keys: ["cap"])
         guard cap > 0, cap.isFinite else { return nil }
         let used = APIValueParser.parseDouble(from: window, keys: ["used"])
-        let resetAt: Date? = {
-            if let raw = window["resetAt"] {
-                if let ms = raw as? NSNumber, ms.doubleValue > 10_000_000_000 {
-                    return Date(timeIntervalSince1970: ms.doubleValue / 1000.0)
-                }
-                if let ts = raw as? Double, ts > 10_000_000_000 {
-                    return Date(timeIntervalSince1970: ts / 1000.0)
-                }
-                if let s = raw as? String, let date = APIValueParser.parseDate(from: s) {
-                    return date
-                }
-            }
-            return nil
-        }()
+        let resetAt = parseFlexibleDate(window["resetAt"])
         return CommandCodeRollingWindow(cap: cap, used: used, resetAt: resetAt)
+    }
+
+    /// Accepts ISO-8601 strings, unix seconds, or unix milliseconds. Values <= 0 are treated as missing.
+    private static func parseFlexibleDate(_ value: Any?) -> Date? {
+        guard let value else { return nil }
+
+        if let number = value as? NSNumber {
+            let raw = number.doubleValue
+            guard raw.isFinite, raw > 0 else { return nil }
+            if raw > 10_000_000_000 {
+                return Date(timeIntervalSince1970: raw / 1000.0)
+            }
+            return Date(timeIntervalSince1970: raw)
+        }
+
+        if let raw = value as? Double {
+            guard raw.isFinite, raw > 0 else { return nil }
+            if raw > 10_000_000_000 {
+                return Date(timeIntervalSince1970: raw / 1000.0)
+            }
+            return Date(timeIntervalSince1970: raw)
+        }
+
+        if let raw = value as? Int {
+            guard raw > 0 else { return nil }
+            let d = Double(raw)
+            if d > 10_000_000_000 {
+                return Date(timeIntervalSince1970: d / 1000.0)
+            }
+            return Date(timeIntervalSince1970: d)
+        }
+
+        if let s = value as? String {
+            return APIValueParser.parseDate(from: s)
+        }
+
+        return nil
     }
 
     private static func parseCreditsPayload(_ data: Data) throws -> CreditsPayload {
@@ -512,7 +642,8 @@ final class CommandCodeProvider: ProviderProtocol {
 
         let planID = dataObject["planId"] as? String ?? dataObject["planID"] as? String
         let status = dataObject["status"] as? String ?? "unknown"
-        let currentPeriodEnd = APIValueParser.parseDate(from: dataObject["currentPeriodEnd"] as? String)
+        let currentPeriodEnd = parseFlexibleDate(dataObject["currentPeriodEnd"])
+            ?? APIValueParser.parseDate(from: dataObject["currentPeriodEnd"] as? String)
 
         return SubscriptionPayload(planID: planID, status: status, currentPeriodEnd: currentPeriodEnd)
     }
