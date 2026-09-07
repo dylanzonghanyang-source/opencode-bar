@@ -51,7 +51,7 @@ Download the latest `.dmg` file from the [**Releases**](https://github.com/opggi
 | **MiniMax Coding Plan** | Quota-based | 5h/weekly quotas, Anthropic-style dual-window submenu, OpenCode auth |
 | **OpenCode Go** | Quota-based | 5h/weekly/monthly usage windows, model API validation, OpenCode auth |
 | **Grok** | Quota-based | Monthly usage, reset time, email-scoped subscription settings, local session tokens |
-| **Z.AI Coding Plan** | Quota-based | Token/MCP quotas, model usage, tool usage (24h) |
+| **Z.AI Coding Plan** | Quota-based | Token/MCP and Lite session/weekly quotas, model usage, tool usage (24h) |
 | **Brave Search** | Quota-based | Monthly search quota, reset schedule |
 | **Tavily** | Quota-based | Monthly search quota, plan usage |
 | **Synthetic** | Quota-based | 5h usage limit, request limits, reset time |
@@ -94,6 +94,19 @@ Download the latest `.dmg` file from the [**Releases**](https://github.com/opggi
 - **Multi-path Support**: Searches `$XDG_DATA_HOME/opencode`, `~/.local/share/opencode`, and `~/Library/Application Support/opencode`
 - **Dynamic Updates**: New providers appear as you add them to OpenCode
 - **Smart Categorization**: Pay-as-you-go vs Quota-based providers displayed separately
+
+### Kiro Authentication
+
+Kiro usage is fetched from its regional usage API with credentials read from
+`~/Library/Application Support/kiro-cli/data.sqlite3`. The database is opened
+read-only. Missing, expired, or rejected credentials appear as authentication
+errors; sign in through Kiro itself to update them.
+
+After installing the current OpenCode Bar CLI, run `scripts/query-kiro.sh --json`
+to query the same provider implementation. Its output and exit codes match
+`opencodebar provider kiro --json`.
+The `provider` command fetches only the selected provider and returns the
+documented authentication or network error exit code if that request fails.
 
 ### Real-time Monitoring
 - **Menu Bar Dashboard**: View all provider usage at a glance

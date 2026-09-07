@@ -47,7 +47,7 @@ final class CLIFormatterTests: XCTestCase {
     
     func testQuotaBasedOverage() {
         let usage = ProviderUsage.quotaBased(remaining: -10, entitlement: 100, overagePermitted: true)
-        XCTAssertEqual(usage.usagePercentage, 110.0)
+        XCTAssertEqual(usage.usagePercentage, 110.0, accuracy: 0.000_001)
     }
     
     // MARK: - ProviderUsage Limit Tests
@@ -460,5 +460,59 @@ final class CLIFormatterTests: XCTestCase {
         XCTAssertTrue(json.contains("\"weeklyUsageUsed\" : 27"), "Missing weeklyUsageUsed in:\n\(json)")
         XCTAssertTrue(json.contains("\"weeklyUsageTotal\" : 10000"), "Missing weeklyUsageTotal in:\n\(json)")
         XCTAssertTrue(json.contains("\"weeklyResetsAt\""), "Missing weeklyResetsAt in:\n\(json)")
+    }
+
+    // MARK: - Balance-style pay-as-you-go formatter tests (DeepSeek)
+
+    /// Table metrics must show the remaining balance (CNY) instead of
+    /// "Cost unavailable" when cost is nil and details carry a balance.
+    func testDeepSeekTableShowsRemainingBalance() {
+        let details = DetailedUsage(
+            creditsBalance: 103.49,
+            balanceCurrency: "CNY",
+            balanceGranted: 0.0,
+            balanceToppedUp: 103.49
+        )
+        let usage = ProviderUsage.payAsYouGo(utilization: 0, cost: nil, resetsAt: nil)
+        let result = ProviderResult(usage: usage, details: details)
+
+        let output = TableFormatter.format([.deepSeek: result])
+        XCTAssertTrue(output.contains("¥103.49 remaining"), "Table should show CNY remaining balance, got:\n\(output)")
+        XCTAssertFalse(output.contains("Cost unavailable"), "Balance must not be reported as unavailable:\n\(output)")
+    }
+
+    /// JSON must emit balance/currency/granted/topped-up for balance-style
+    /// pay-as-you-go providers and omit "cost".
+    func testDeepSeekJSONIncludesBalanceFields() throws {
+        let details = DetailedUsage(
+            creditsBalance: 103.49,
+            balanceCurrency: "CNY",
+            balanceGranted: 0.0,
+            balanceToppedUp: 103.49
+        )
+        let usage = ProviderUsage.payAsYouGo(utilization: 0, cost: nil, resetsAt: nil)
+        let result = ProviderResult(usage: usage, details: details)
+
+        let json = try JSONFormatter.format([.deepSeek: result])
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: [String: Any]])
+        let provider = try XCTUnwrap(payload["deepseek"])
+        // Compare JSON numbers rather than their platform-dependent decimal spelling.
+        XCTAssertEqual(try XCTUnwrap(provider["balance"] as? Double), 103.49, accuracy: 0.000_001)
+        XCTAssertEqual(provider["currency"] as? String, "CNY")
+        XCTAssertEqual(provider["grantedBalance"] as? Double, 0)
+        XCTAssertEqual(try XCTUnwrap(provider["toppedUpBalance"] as? Double), 103.49, accuracy: 0.000_001)
+        XCTAssertNil(provider["cost"])
+    }
+
+    /// Providers with a real cost keep the existing "$x spent" rendering.
+    func testPayAsYouGoWithCostKeepsSpentRendering() throws {
+        let usage = ProviderUsage.payAsYouGo(utilization: 0, cost: 12.34, resetsAt: nil)
+        let result = ProviderResult(usage: usage, details: nil)
+
+        let table = TableFormatter.format([.openRouter: result])
+        XCTAssertTrue(table.contains("$12.34 spent"), "Table should show spent cost, got:\n\(table)")
+
+        let json = try JSONFormatter.format([.openRouter: result])
+        XCTAssertTrue(json.contains("\"cost\" : 12.34"), "JSON should keep cost, got:\n\(json)")
     }
 }
