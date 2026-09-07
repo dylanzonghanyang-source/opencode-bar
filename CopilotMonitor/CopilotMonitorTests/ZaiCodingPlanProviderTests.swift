@@ -368,6 +368,19 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
 
     // MARK: - Weekly propagation (status bar / change detection / hasAnyValue)
 
+    @MainActor
+    func testMenuConstructionDoesNotStartProviderRefresh() {
+        XCTAssertNotNil(NSClassFromString("XCTestCase"))
+        let controller = StatusBarController(startBackgroundServices: false)
+        let properties = Mirror(reflecting: controller).children
+        for name in ["refreshTimer", "initialRefreshTask"] {
+            guard let property = properties.first(where: { $0.label == name }) else {
+                return XCTFail("Missing controller property: \(name)")
+            }
+            XCTAssertTrue(Mirror(reflecting: property.value).children.isEmpty, "\(name) started during menu construction")
+        }
+    }
+
     /// Weekly usage must appear in the status-bar candidate list with the
     /// 7-day window priority so a Lite account shows the right top-bar window.
     @MainActor
@@ -411,18 +424,7 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
     /// the top-level provider row, including a weekly-only account.
     @MainActor
     func testZaiTopLevelRowsRenderAllActiveWindows() {
-        let githubStarPromptKey = "githubStarPromptDismissed"
-        let previousPromptValue = UserDefaults.standard.object(forKey: githubStarPromptKey)
-        UserDefaults.standard.set(true, forKey: githubStarPromptKey)
-        defer {
-            if let previousPromptValue {
-                UserDefaults.standard.set(previousPromptValue, forKey: githubStarPromptKey)
-            } else {
-                UserDefaults.standard.removeObject(forKey: githubStarPromptKey)
-            }
-        }
-
-        let controller = StatusBarController()
+        let controller = StatusBarController(startBackgroundServices: false)
         controller.loadDemoData()
 
         guard let menu = menu(from: controller) else {
@@ -450,7 +452,7 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
             weeklyUsagePercent: 27,
             weeklyUsageReset: Date(timeIntervalSince1970: 1_787_301_777)
         )
-        let submenu = StatusBarController().createDetailSubmenu(
+        let submenu = StatusBarController(startBackgroundServices: false).createDetailSubmenu(
             details,
             identifier: .zaiCodingPlan
         )
@@ -474,4 +476,44 @@ final class ZaiCodingPlanProviderTests: XCTestCase {
         XCTAssertFalse(DetailedUsage().hasAnyValue)
     }
 
+    func testTransientNetworkErrorClassification() {
+        let wrappedTimeout = NSError(
+            domain: "ZaiCodingPlanProviderTests",
+            code: 1,
+            userInfo: [
+                NSUnderlyingErrorKey: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+            ]
+        )
+        let cases: [(Error, Bool)] = [
+            (ProviderError.networkError("HTTP 500"), true),
+            (ProviderError.networkError("TLS handshake failed"), true),
+            (ProviderError.networkError("HTTP 400"), false),
+            (ProviderError.authenticationFailed("Invalid API key"), false),
+            (NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut), true),
+            (NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost), true),
+            (NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet), true),
+            (NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost), true),
+            (wrappedTimeout, true),
+            (NSError(domain: NSURLErrorDomain, code: NSURLErrorBadURL), false)
+        ]
+
+        for (error, expected) in cases {
+            XCTAssertEqual(
+                ZaiCodingPlanProvider.isTransientNetworkError(error),
+                expected,
+                "error: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    func testRetryDelayUsesBoundedJitter() {
+        XCTAssertEqual(
+            ZaiCodingPlanProvider.retryDelayNanoseconds(for: 1, jitter: 0),
+            500_000_000
+        )
+        XCTAssertEqual(
+            ZaiCodingPlanProvider.retryDelayNanoseconds(for: 2, jitter: 250_000_000),
+            1_250_000_000
+        )
+    }
 }

@@ -92,7 +92,6 @@
 		SYNTHETIC1111111111111111 /* SyntheticProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNTHETIC2222222222222222 /* SyntheticProvider.swift */; };
 		SYNTHTEST2222222222222222 /* SyntheticProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNTHTEST1111111111111111 /* SyntheticProviderTests.swift */; };
 		NANOGPTTESTBF1111111111 /* NanoGptProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = NANOGPTTESTFR1111111111 /* NanoGptProviderTests.swift */; };
-		ZAITESTBF1111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZAITESTFR1111111111111 /* ZaiCodingPlanProviderTests.swift */; };
 		CLIFMTTESTBF1111111111 /* CLIFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */; };
 		DEEPSKIPTESTBF1111111 /* DeepSeekProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEEPSKIPTESTFR1111111 /* DeepSeekProviderTests.swift */; };
 		TOKENTESTBF1111111111111 /* TokenManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TOKENTESTFR1111111111111 /* TokenManagerTests.swift */; };
@@ -100,6 +99,7 @@
 		OCAUTHTESTBF11111111111 /* OpenCodeAuthDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */; };
 		OCZENTESTBF111111111111 /* OpenCodeZenProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */; };
 		CLAUDETESTBF11111111111 /* ClaudeProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */; };
+		ZAITESTBF11111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */; };
 		ME1111111111111111111111 /* MenuEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = ME2222222222222222222222 /* MenuEnums.swift */; };
 		OC1111111111111111111111 /* OpenCodeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC2222222222222222222222 /* OpenCodeProvider.swift */; };
 		OR1111111111111111111111 /* OpenRouterProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = OR2222222222222222222222 /* OpenRouterProvider.swift */; };
@@ -239,7 +239,6 @@
 		SYNTHETIC2222222222222222 /* SyntheticProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProvider.swift; sourceTree = "<group>"; };
 		SYNTHTEST1111111111111111 /* SyntheticProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyntheticProviderTests.swift; sourceTree = "<group>"; };
 		NANOGPTTESTFR1111111111 /* NanoGptProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoGptProviderTests.swift; sourceTree = "<group>"; };
-		ZAITESTFR1111111111111 /* ZaiCodingPlanProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiCodingPlanProviderTests.swift; sourceTree = "<group>"; };
 		CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIFormatterTests.swift; sourceTree = "<group>"; };
 		DEEPSKIPTESTFR1111111 /* DeepSeekProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepSeekProviderTests.swift; sourceTree = "<group>"; };
 		TOKENTESTFR1111111111111 /* TokenManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenManagerTests.swift; sourceTree = "<group>"; };
@@ -247,6 +246,7 @@
 		OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenCodeAuthDecodingTests.swift; sourceTree = "<group>"; };
 		OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenCodeZenProviderTests.swift; sourceTree = "<group>"; };
 		CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderTests.swift; sourceTree = "<group>"; };
+		ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiCodingPlanProviderTests.swift; sourceTree = "<group>"; };
 		TDDDDDDDDDDDDDDDDDDDDDD /* CopilotMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CopilotMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -465,7 +465,6 @@
 				54353FD130DDE0500F6B367F /* MenuResultBuilderTests.swift */,
 				SYNTHTEST1111111111111111 /* SyntheticProviderTests.swift */,
 				NANOGPTTESTFR1111111111 /* NanoGptProviderTests.swift */,
-				ZAITESTFR1111111111111 /* ZaiCodingPlanProviderTests.swift */,
 				CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */,
 				DEEPSKIPTESTFR1111111 /* DeepSeekProviderTests.swift */,
 				MINIMAXTESTFR11111111111 /* MiniMaxProviderTests.swift */,
@@ -479,6 +478,7 @@
 				OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */,
 				OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */,
 				CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */,
+				ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */,
 			);
 			path = CopilotMonitorTests;
 			sourceTree = "<group>";
@@ -730,7 +730,6 @@
 			B58BAD3BFD97973070A2A892 /* MenuResultBuilderTests.swift in Sources */,
 			SYNTHTEST2222222222222222 /* SyntheticProviderTests.swift in Sources */,
 			NANOGPTTESTBF1111111111 /* NanoGptProviderTests.swift in Sources */,
-			ZAITESTBF1111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */,
 			CLIFMTTESTBF1111111111 /* CLIFormatterTests.swift in Sources */,
 			DEEPSKIPTESTBF1111111 /* DeepSeekProviderTests.swift in Sources */,
 			MINIMAXTESTBF11111111111 /* MiniMaxProviderTests.swift in Sources */,
@@ -744,6 +743,7 @@
 			OCAUTHTESTBF11111111111 /* OpenCodeAuthDecodingTests.swift in Sources */,
 			OCZENTESTBF111111111111 /* OpenCodeZenProviderTests.swift in Sources */,
 			CLAUDETESTBF11111111111 /* ClaudeProviderTests.swift in Sources */,
+			ZAITESTBF11111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */,
 		);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

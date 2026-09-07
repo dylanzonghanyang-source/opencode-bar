@@ -273,19 +273,24 @@ final class StatusBarController: NSObject {
         }
     }
 
-    override init() {
+    init(startBackgroundServices: Bool) {
         super.init()
         debugLog("StatusBarController init started")
 
-        TokenManager.shared.logDebugEnvironmentInfo()
-        debugLog("Environment debug info logged")
-
-        ensureBraveRefreshModeDefault()
+        if startBackgroundServices {
+            TokenManager.shared.logDebugEnvironmentInfo()
+            ensureBraveRefreshModeDefault()
+        }
 
         setupStatusItem()
         debugLog("setupStatusItem completed")
         setupMenu()
         debugLog("setupMenu completed")
+        // Menu tests must not launch credential discovery, network refreshes, or modal prompts.
+        guard startBackgroundServices else {
+            logger.debug("Menu initialized without background services")
+            return
+        }
         setupNotificationObservers()
         debugLog("setupNotificationObservers completed")
         startRefreshTimer()

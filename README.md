@@ -425,6 +425,8 @@ For ChatGPT/Codex multi-account setups, the app also searches:
 
 If `oc-chatgpt-multi-auth` is installed and OpenCode sets `provider.openai.options.baseURL` to a localhost proxy, OpenCode Bar still queries the direct ChatGPT usage endpoint by default. Only the explicit `opencode-bar.codex.usageURL` override changes the usage endpoint.
 
+OpenCode Bar also reads `provider.openai.options.apiKey` from the OpenCode configuration. API-key accounts require an external codex-lb usage endpoint configured through `opencode-bar.codex.usageURL`. When its response includes `upstream_limits`, those account-level quota windows take precedence over per-key `limits`.
+
 ### GitHub Copilot not showing
 GitHub Copilot accounts are discovered from multiple sources (in priority order):
 1. **OpenCode auth** — `copilot` entry in OpenCode `auth.json`
