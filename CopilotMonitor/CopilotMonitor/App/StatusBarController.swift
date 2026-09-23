@@ -223,6 +223,15 @@ enum MainMenuProviderPresentation {
         return patterns.contains { lowercased.contains($0) }
     }
 
+    /// True when a key provider's credential expired, so the row must stay visible.
+    static func shouldForceAuthorizationExpiryRow(
+        identifier: ProviderIdentifier,
+        errorMessage: String
+    ) -> Bool {
+        authorizationExpiryVisibleProviders.contains(identifier)
+            && isAuthorizationExpiredError(errorMessage)
+    }
+
     static func shouldHideErrorOnlyProvider(
         identifier: ProviderIdentifier,
         result: ProviderResult?,
@@ -230,8 +239,7 @@ enum MainMenuProviderPresentation {
         isLoading: Bool
     ) -> Bool {
         guard let errorMessage, !isLoading else { return false }
-        if authorizationExpiryVisibleProviders.contains(identifier),
-           isAuthorizationExpiredError(errorMessage) {
+        if shouldForceAuthorizationExpiryRow(identifier: identifier, errorMessage: errorMessage) {
             return false
         }
         return !hasValidMetric(for: identifier, result: result)
@@ -2121,8 +2129,15 @@ final class StatusBarController: NSObject {
                 continue
             }
 
+            let showsAuthorizationExpiry = errorMessage.map {
+                MainMenuProviderPresentation.shouldForceAuthorizationExpiryRow(
+                    identifier: identifier,
+                    errorMessage: $0
+                )
+            } ?? false
+
             if let errorMessage,
-               !hasValidMetric,
+               !hasValidMetric || showsAuthorizationExpiry,
                shouldDisplayErrorStateEvenWithResult(errorMessage, identifier: identifier, result: result) {
                 hasQuota = true
                 let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
@@ -2470,9 +2485,16 @@ final class StatusBarController: NSObject {
                 continue
             }
 
+            let showsAuthorizationExpiry = errorMessage.map {
+                MainMenuProviderPresentation.shouldForceAuthorizationExpiryRow(
+                    identifier: identifier,
+                    errorMessage: $0
+                )
+            } ?? false
+
             if let errorMessage,
-               !hasValidMetric,
-               shouldDisplayErrorStateEvenWithResult(errorMessage) {
+               !hasValidMetric || showsAuthorizationExpiry,
+               shouldDisplayErrorStateEvenWithResult(errorMessage, identifier: identifier, result: result) {
                 hasPayAsYouGo = true
                 let item = createErrorMenuItem(identifier: identifier, errorMessage: errorMessage)
                 if item.isEnabled {
@@ -3125,12 +3147,19 @@ final class StatusBarController: NSObject {
         }
     }
 
-    private func errorMenuStatus(for errorMessage: String) -> ErrorMenuStatus {
+    private func errorMenuStatus(
+        for errorMessage: String,
+        identifier: ProviderIdentifier? = nil
+    ) -> ErrorMenuStatus {
         let lowercased = errorMessage.lowercased()
         if isRateLimitError(errorMessage) {
             return .rateLimited
         }
-        if MainMenuProviderPresentation.isAuthorizationExpiredError(errorMessage) {
+        if let identifier,
+           MainMenuProviderPresentation.shouldForceAuthorizationExpiryRow(
+               identifier: identifier,
+               errorMessage: errorMessage
+           ) {
             return .authorizationExpired
         }
         if lowercased.contains("subscription") {
@@ -3160,11 +3189,11 @@ final class StatusBarController: NSObject {
         identifier: ProviderIdentifier,
         result: ProviderResult?
     ) -> Bool {
-        if MainMenuProviderPresentation.authorizationExpiryVisibleProviders.contains(identifier),
-           MainMenuProviderPresentation.isAuthorizationExpiredError(errorMessage) {
+        let status = errorMenuStatus(for: errorMessage, identifier: identifier)
+        if status == .authorizationExpired {
             return true
         }
-        guard shouldDisplayErrorStateEvenWithResult(errorMessage) else { return false }
+        guard status == .rateLimited else { return false }
 
         if ProviderDisplayPolicy.shouldShowRateLimitedErrorRow(
             identifier: identifier,
@@ -3183,7 +3212,7 @@ final class StatusBarController: NSObject {
     }
 
     private func createErrorMenuItem(identifier: ProviderIdentifier, errorMessage: String) -> NSMenuItem {
-        let status = errorMenuStatus(for: errorMessage)
+        let status = errorMenuStatus(for: errorMessage, identifier: identifier)
         let statusText = status.title
         let title = "\(identifier.displayName) (\(statusText))"
 
@@ -3205,7 +3234,9 @@ final class StatusBarController: NSObject {
         let submenu = NSMenu()
 
         let statusItem = NSMenuItem()
-        statusItem.view = createDisabledLabelView(text: "Status: \(errorMenuStatus(for: errorMessage).title)")
+        statusItem.view = createDisabledLabelView(
+            text: "Status: \(errorMenuStatus(for: errorMessage, identifier: identifier).title)"
+        )
         submenu.addItem(statusItem)
 
         let errorItem = NSMenuItem()
