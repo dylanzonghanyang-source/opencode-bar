@@ -2235,12 +2235,10 @@ final class StatusBarController: NSObject {
                             accountDisplayLabel = nil
                         }
 
-                        if let accountDisplayLabel {
-                            if displayAccounts.count > 1 {
-                                displayName += " (\(accountDisplayLabel))"
-                            } else {
-                                displayName = "\(baseName) (\(accountDisplayLabel))"
-                            }
+                        if let accountDisplayLabel, displayAccounts.count > 1 {
+                            // Single-account rows keep the bare provider name so quota rows read the
+                            // same as pay-as-you-go rows; the account label stays in the submenu.
+                            displayName += " (\(accountDisplayLabel))"
                         } else if displayAccounts.count > 1, showAuthLabel {
                             let sourceLabel = authSourceLabel(for: account.details?.authSource, provider: identifier) ?? "Unknown"
                             displayName += " (\(sourceLabel))"
