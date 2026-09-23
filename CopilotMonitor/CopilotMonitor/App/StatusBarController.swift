@@ -184,13 +184,56 @@ enum MainMenuProviderPresentation {
         .openRouter
     ]
 
+    /// Providers whose expired authorization must stay visible instead of being hidden.
+    static let authorizationExpiryVisibleProviders: Set<ProviderIdentifier> = [
+        .codex,
+        .commandCode,
+        .zaiCodingPlan,
+        .timicc,
+        .deepSeek
+    ]
+
+    /// "Never configured" errors — these providers stay hidden.
+    static func isMissingCredentialError(_ errorMessage: String) -> Bool {
+        let lowercased = errorMessage.lowercased()
+        let patterns = [
+            "not available",
+            "not configured",
+            "credentials not found",
+            "missing credentials",
+            "no openai accounts configured"
+        ]
+        return patterns.contains { lowercased.contains($0) }
+    }
+
+    /// "Configured, but the stored credential no longer works" errors.
+    static func isAuthorizationExpiredError(_ errorMessage: String) -> Bool {
+        guard !isMissingCredentialError(errorMessage) else { return false }
+        let lowercased = errorMessage.lowercased()
+        let patterns = [
+            "401",
+            "403",
+            "unauthorized",
+            "invalid_grant",
+            "invalid token",
+            "invalid or missing",
+            "expired",
+            "token refresh failed"
+        ]
+        return patterns.contains { lowercased.contains($0) }
+    }
+
     static func shouldHideErrorOnlyProvider(
         identifier: ProviderIdentifier,
         result: ProviderResult?,
         errorMessage: String?,
         isLoading: Bool
     ) -> Bool {
-        guard errorMessage != nil, !isLoading else { return false }
+        guard let errorMessage, !isLoading else { return false }
+        if authorizationExpiryVisibleProviders.contains(identifier),
+           isAuthorizationExpiredError(errorMessage) {
+            return false
+        }
         return !hasValidMetric(for: identifier, result: result)
     }
 
@@ -3036,6 +3079,7 @@ final class StatusBarController: NSObject {
         case rateLimited
         case noCredentials
         case noSubscription
+        case authorizationExpired
         case error
 
         var title: String {
@@ -3046,6 +3090,8 @@ final class StatusBarController: NSObject {
                 return "No Credentials"
             case .noSubscription:
                 return "No Subscription"
+            case .authorizationExpired:
+                return "Authorization expired"
             case .error:
                 return "Error"
             }
@@ -3055,7 +3101,7 @@ final class StatusBarController: NSObject {
             switch self {
             case .rateLimited, .error:
                 return false
-            case .noCredentials, .noSubscription:
+            case .noCredentials, .noSubscription, .authorizationExpired:
                 return true
             }
         }
@@ -3064,14 +3110,14 @@ final class StatusBarController: NSObject {
             switch self {
             case .noCredentials:
                 return false
-            case .rateLimited, .noSubscription, .error:
+            case .rateLimited, .noSubscription, .authorizationExpired, .error:
                 return true
             }
         }
 
         var shouldDisableListItem: Bool {
             switch self {
-            case .rateLimited, .error:
+            case .rateLimited, .authorizationExpired, .error:
                 return true
             case .noCredentials, .noSubscription:
                 return false
@@ -3084,6 +3130,9 @@ final class StatusBarController: NSObject {
         if isRateLimitError(errorMessage) {
             return .rateLimited
         }
+        if MainMenuProviderPresentation.isAuthorizationExpiredError(errorMessage) {
+            return .authorizationExpired
+        }
         if lowercased.contains("subscription") {
             return .noSubscription
         }
@@ -3095,7 +3144,7 @@ final class StatusBarController: NSObject {
 
     private func shouldDisplayErrorStateEvenWithResult(_ errorMessage: String) -> Bool {
         switch errorMenuStatus(for: errorMessage) {
-        case .rateLimited:
+        case .rateLimited, .authorizationExpired:
             return true
         case .noCredentials, .noSubscription, .error:
             return false
@@ -3111,6 +3160,10 @@ final class StatusBarController: NSObject {
         identifier: ProviderIdentifier,
         result: ProviderResult?
     ) -> Bool {
+        if MainMenuProviderPresentation.authorizationExpiryVisibleProviders.contains(identifier),
+           MainMenuProviderPresentation.isAuthorizationExpiredError(errorMessage) {
+            return true
+        }
         guard shouldDisplayErrorStateEvenWithResult(errorMessage) else { return false }
 
         if ProviderDisplayPolicy.shouldShowRateLimitedErrorRow(
