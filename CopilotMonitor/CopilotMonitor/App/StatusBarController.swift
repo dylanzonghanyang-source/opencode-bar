@@ -2252,6 +2252,9 @@ final class StatusBarController: NSObject {
                         if let unavailableLabel {
                             displayName += " (\(unavailableLabel))"
                         }
+                        // The latest refresh failed; this row renders the previous
+                        // successful result, so mark it as cached data.
+                        displayName += cachedDataSuffix(errorMessage)
                         let isUnavailableRateLimited = unavailableLabel == "Rate limited"
                         insertQuotaMenuItem(
                             name: displayName,
@@ -2268,7 +2271,7 @@ final class StatusBarController: NSObject {
                     hasQuota = true
                     let singlePercent = entitlement > 0 ? (Double(entitlement - remaining) / Double(entitlement)) * 100 : 0
                     insertQuotaMenuItem(
-                        name: identifier.displayName,
+                        name: identifier.displayName + cachedDataSuffix(errorMessage),
                         identifier: identifier,
                         primaryUsage: singlePercent,
                         details: result.details,
@@ -2515,7 +2518,7 @@ final class StatusBarController: NSObject {
                         currencySymbol: result.details?.balanceCurrencySymbol ?? ""
                     )
                     let item = createProviderParentMenuItem(
-                        name: identifier.displayName,
+                        name: identifier.displayName + cachedDataSuffix(errorMessage),
                         icon: iconForProvider(identifier),
                         isEnabled: true
                     )
@@ -3172,6 +3175,13 @@ final class StatusBarController: NSObject {
             return .noCredentials
         }
         return .error
+    }
+
+    /// Suffix for rows that render the previous successful result because the
+    /// latest refresh failed (expired credentials, network errors, etc.).
+    /// Keeps silent staleness visible instead of showing stale numbers as fresh.
+    private func cachedDataSuffix(_ errorMessage: String?) -> String {
+        errorMessage != nil ? " (cached)" : ""
     }
 
     private func shouldDisplayErrorStateEvenWithResult(_ errorMessage: String) -> Bool {
