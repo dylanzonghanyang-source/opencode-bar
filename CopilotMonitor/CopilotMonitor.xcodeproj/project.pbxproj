@@ -106,11 +106,13 @@
 		TIMICCTESTBF11111111 /* TimiccProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TIMICCTESTFR11111111 /* TimiccProviderTests.swift */; };
 		XAISGTESTBF000000000001 /* XaiSuperGrokProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = XAISGTESTFR000000000001 /* XaiSuperGrokProviderTests.swift */; };
 
+		CLIFMTTESTBF1111111111 /* CLIFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */; };
 		TOKENTESTBF1111111111111 /* TokenManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TOKENTESTFR1111111111111 /* TokenManagerTests.swift */; };
 		CODEXTESTBF111111111111 /* CodexProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CODEXTESTFR111111111111 /* CodexProviderTests.swift */; };
 		OCAUTHTESTBF11111111111 /* OpenCodeAuthDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */; };
 		OCZENTESTBF111111111111 /* OpenCodeZenProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */; };
 		CLAUDETESTBF11111111111 /* ClaudeProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */; };
+		ZAITESTBF11111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */; };
 		ME1111111111111111111111 /* MenuEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = ME2222222222222222222222 /* MenuEnums.swift */; };
 		OC1111111111111111111111 /* OpenCodeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = OC2222222222222222222222 /* OpenCodeProvider.swift */; };
 		OR1111111111111111111111 /* OpenRouterProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = OR2222222222222222222222 /* OpenRouterProvider.swift */; };
@@ -260,11 +262,13 @@
 		TIMICCTESTFR11111111 /* TimiccProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimiccProviderTests.swift; sourceTree = "<group>"; };
 		XAISGTESTFR000000000001 /* XaiSuperGrokProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XaiSuperGrokProviderTests.swift; sourceTree = "<group>"; };
 
+		CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIFormatterTests.swift; sourceTree = "<group>"; };
 		TOKENTESTFR1111111111111 /* TokenManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenManagerTests.swift; sourceTree = "<group>"; };
 		CODEXTESTFR111111111111 /* CodexProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProviderTests.swift; sourceTree = "<group>"; };
 		OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenCodeAuthDecodingTests.swift; sourceTree = "<group>"; };
 		OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenCodeZenProviderTests.swift; sourceTree = "<group>"; };
 		CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeProviderTests.swift; sourceTree = "<group>"; };
+		ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZaiCodingPlanProviderTests.swift; sourceTree = "<group>"; };
 		TDDDDDDDDDDDDDDDDDDDDDD /* CopilotMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CopilotMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -493,6 +497,7 @@
 				TIMICCTESTFR11111111 /* TimiccProviderTests.swift */,
 				XAISGTESTFR000000000001 /* XaiSuperGrokProviderTests.swift */,
 
+				CLIFMTTESTFR1111111111 /* CLIFormatterTests.swift */,
 				MINIMAXTESTFR11111111111 /* MiniMaxProviderTests.swift */,
 				OCGOTESTFR11111111111 /* OpenCodeGoProviderTests.swift */,
 				GROKTESTFR11111111111 /* GrokProviderTests.swift */,
@@ -504,6 +509,7 @@
 				OCAUTHTESTFR11111111111 /* OpenCodeAuthDecodingTests.swift */,
 				OCZENTESTFR111111111111 /* OpenCodeZenProviderTests.swift */,
 				CLAUDETESTFR11111111111 /* ClaudeProviderTests.swift */,
+				ZAITESTFR11111111111111 /* ZaiCodingPlanProviderTests.swift */,
 			);
 			path = CopilotMonitorTests;
 			sourceTree = "<group>";
@@ -769,6 +775,7 @@
 			TIMICCTESTBF11111111 /* TimiccProviderTests.swift in Sources */,
 			XAISGTESTBF000000000001 /* XaiSuperGrokProviderTests.swift in Sources */,
 
+			CLIFMTTESTBF1111111111 /* CLIFormatterTests.swift in Sources */,
 			MINIMAXTESTBF11111111111 /* MiniMaxProviderTests.swift in Sources */,
 			OCGOTESTBF11111111111 /* OpenCodeGoProviderTests.swift in Sources */,
 			GROKTESTBF11111111111 /* GrokProviderTests.swift in Sources */,
@@ -780,6 +787,7 @@
 			OCAUTHTESTBF11111111111 /* OpenCodeAuthDecodingTests.swift in Sources */,
 			OCZENTESTBF111111111111 /* OpenCodeZenProviderTests.swift in Sources */,
 			CLAUDETESTBF11111111111 /* ClaudeProviderTests.swift in Sources */,
+			ZAITESTBF11111111111111 /* ZaiCodingPlanProviderTests.swift in Sources */,
 		);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -47,7 +47,7 @@ final class CLIFormatterTests: XCTestCase {
     
     func testQuotaBasedOverage() {
         let usage = ProviderUsage.quotaBased(remaining: -10, entitlement: 100, overagePermitted: true)
-        XCTAssertEqual(usage.usagePercentage, 110.0)
+        XCTAssertEqual(usage.usagePercentage, 110.0, accuracy: 0.000_001)
     }
     
     // MARK: - ProviderUsage Limit Tests
@@ -494,11 +494,14 @@ final class CLIFormatterTests: XCTestCase {
         let result = ProviderResult(usage: usage, details: details)
 
         let json = try JSONFormatter.format([.deepSeek: result])
-        XCTAssertTrue(json.contains("\"balance\" : 103.49"), "Missing balance in:\n\(json)")
-        XCTAssertTrue(json.contains("\"currency\" : \"CNY\""), "Missing currency in:\n\(json)")
-        XCTAssertTrue(json.contains("\"grantedBalance\" : 0"), "Missing grantedBalance in:\n\(json)")
-        XCTAssertTrue(json.contains("\"toppedUpBalance\" : 103.49"), "Missing toppedUpBalance in:\n\(json)")
-        XCTAssertFalse(json.contains("\"cost\""), "cost must stay nil for balance-style providers:\n\(json)")
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: [String: Any]])
+        let provider = try XCTUnwrap(payload["deepseek"])
+        // Compare JSON numbers rather than their platform-dependent decimal spelling.
+        XCTAssertEqual(try XCTUnwrap(provider["balance"] as? Double), 103.49, accuracy: 0.000_001)
+        XCTAssertEqual(provider["currency"] as? String, "CNY")
+        XCTAssertEqual(provider["grantedBalance"] as? Double, 0)
+        XCTAssertEqual(try XCTUnwrap(provider["toppedUpBalance"] as? Double), 103.49, accuracy: 0.000_001)
+        XCTAssertNil(provider["cost"])
     }
 
     /// Providers with a real cost keep the existing "$x spent" rendering.

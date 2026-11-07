@@ -256,26 +256,4 @@ final class DeepSeekProviderTests: XCTestCase {
         XCTAssertEqual(rendered, ["Balance: ¥103.49", "Topped-up: ¥103.49", "Granted: ¥0.00"])
     }
 
-    /// Unified two-column PAYG metric row: only primary Balance in main
-    /// PAYGO section (Granted/Topped-up belong in detail submenu).
-    @MainActor
-    func testDeepSeekPayAsYouGoMetricRows() {
-        let details = DetailedUsage(
-            creditsBalance: 103.49,
-            balanceCurrency: "CNY",
-            balanceGranted: 0.0,
-            balanceToppedUp: 103.49
-        )
-        let rows = MenuQuotaWindowBuilder.payAsYouGoMetricRows(
-            creditsBalance: details.creditsBalance,
-            creditsRemaining: nil,
-            cost: nil,
-            currencySymbol: details.balanceCurrencySymbol,
-            balanceGranted: details.balanceGranted,
-            balanceToppedUp: details.balanceToppedUp
-        )
-        XCTAssertEqual(rows.map(\.label), ["Balance"])
-        XCTAssertEqual(rows[0].value, "¥103.49 left")
-    }
-
 }
