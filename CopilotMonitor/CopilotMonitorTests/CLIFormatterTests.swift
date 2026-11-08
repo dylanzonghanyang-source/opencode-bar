@@ -655,9 +655,9 @@ final class CLIFormatterTests: XCTestCase {
 
     func testCommandCodeWindowsShowRollingAndMonthlyUsed() {
         let details = DetailedUsage(
+            monthlyUsage: 56,
             fiveHourUsage: 12,
-            sevenDayUsage: 34,
-            monthlyUsage: 56
+            sevenDayUsage: 34
         )
 
         let windows = MenuQuotaWindowBuilder.windows(
@@ -691,8 +691,8 @@ final class CLIFormatterTests: XCTestCase {
     func testZAIWindowsAreExplicitAndOrdered() {
         let details = DetailedUsage(
             tokenUsagePercent: 1,
-            weeklyUsagePercent: 2,
-            mcpUsagePercent: 99
+            mcpUsagePercent: 99,
+            weeklyUsagePercent: 2
         )
 
         let windows = MenuQuotaWindowBuilder.windows(

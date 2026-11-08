@@ -168,8 +168,14 @@ final class DashScopeProvider: ProviderProtocol {
         request.setValue("https://billing-cost.console.aliyun.com/", forHTTPHeaderField: "Referer")
 
         let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            logger.error("DashScope user info request failed: \(String(describing: (response as? HTTPURLResponse)?.statusCode))")
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ProviderError.networkError("User info request failed")
+        }
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                throw ProviderError.authenticationFailed("HTTP \(httpResponse.statusCode) — Alibaba Cloud session expired")
+            }
+            logger.error("DashScope user info request failed: \(httpResponse.statusCode)")
             throw ProviderError.networkError("User info request failed")
         }
 

@@ -224,8 +224,8 @@ final class CommandCodeProviderTests: XCTestCase {
             authSource: "test"
         )
 
-        XCTAssertEqual(snapshot.fiveHourWindow?.usagePercent, 50)
-        XCTAssertEqual(snapshot.weeklyWindow?.usagePercent, 12.5, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.fiveHourWindow?.usagePercent ?? 0, 50)
+        XCTAssertEqual(snapshot.weeklyWindow?.usagePercent ?? 0, 12.5, accuracy: 0.0001)
     }
 
     func testDirectAPISnapshotIgnoresInvalidWindowCap() throws {
@@ -362,7 +362,7 @@ final class CommandCodeProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.fiveHourWindow?.used, 0)
         XCTAssertNil(snapshot.fiveHourWindow?.resetAt)
         XCTAssertEqual(snapshot.weeklyWindow?.usagePercent ?? 0, (0.6441907277 / 35.0) * 100.0, accuracy: 0.001)
-        XCTAssertEqual(snapshot.weeklyWindow?.resetAt?.timeIntervalSince1970, 1_787_626_934.484, accuracy: 0.001)
+        XCTAssertEqual(snapshot.weeklyWindow?.resetAt?.timeIntervalSince1970 ?? 0, 1_787_626_934.484, accuracy: 0.001)
         XCTAssertEqual(snapshot.purchasedCredits, 0)
         XCTAssertEqual(snapshot.authSource, "Command Code CLI (~/.commandcode/auth.json)")
 
