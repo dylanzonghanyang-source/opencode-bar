@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.version != '') }}
       VERSION_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
