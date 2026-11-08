@@ -44,3 +44,6 @@ package-lock.json
 # Local runtime artifacts
 data/
 nohup.out
+
+# Local build directory
+.derivedData/

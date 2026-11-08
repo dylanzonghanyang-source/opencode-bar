@@ -845,4 +845,77 @@ final class CLIFormatterTests: XCTestCase {
             )
         )
     }
+
+    func testPrivateProvidersForceAuthorizationExpiryVisibility() {
+        let expiredMessage = "Command Code credentials are invalid or expired."
+        let privateProviders: [ProviderIdentifier] = [
+            .codex,
+            .commandCode,
+            .zaiCodingPlan,
+            .timicc,
+            .deepSeek,
+            .dashScope,
+            .openCodeGo,
+            .xaiSuperGrok
+        ]
+        for identifier in privateProviders {
+            XCTAssertTrue(
+                MainMenuProviderPresentation.authorizationExpiryVisibleProviders.contains(identifier),
+                "\(identifier.rawValue) should stay visible when its authorization expires"
+            )
+            XCTAssertTrue(
+                MainMenuProviderPresentation.shouldForceAuthorizationExpiryRow(
+                    identifier: identifier,
+                    errorMessage: expiredMessage
+                )
+            )
+            XCTAssertFalse(
+                MainMenuProviderPresentation.shouldHideErrorOnlyProvider(
+                    identifier: identifier,
+                    result: nil,
+                    errorMessage: expiredMessage,
+                    isLoading: false
+                )
+            )
+        }
+    }
+
+    func testCredentialRefreshHintCoversWhitelistedProviders() {
+        XCTAssertEqual(
+            MainMenuProviderPresentation.credentialRefreshHint(for: .commandCode),
+            "Run `cmd logout && cmd login` in Terminal to refresh the CLI API key."
+        )
+        XCTAssertEqual(
+            MainMenuProviderPresentation.credentialRefreshHint(for: .codex),
+            "Run `opencode` in Terminal once to refresh the ChatGPT token."
+        )
+        let hintedProviders: [ProviderIdentifier] = [
+            .zaiCodingPlan,
+            .deepSeek,
+            .dashScope,
+            .timicc,
+            .openCodeGo,
+            .xaiSuperGrok
+        ]
+        for identifier in hintedProviders {
+            let hint = MainMenuProviderPresentation.credentialRefreshHint(for: identifier)
+            XCTAssertNotNil(hint, "\(identifier.rawValue) should provide a refresh hint")
+            XCTAssertFalse(hint!.isEmpty)
+        }
+        XCTAssertNil(MainMenuProviderPresentation.credentialRefreshHint(for: .claude))
+        XCTAssertNil(MainMenuProviderPresentation.credentialRefreshHint(for: .copilot))
+    }
+
+    func testMissingCredentialErrorsNeverClassifyAsExpired() {
+        let notConfigured = "Command Code credentials not found"
+        XCTAssertFalse(
+            MainMenuProviderPresentation.isAuthorizationExpiredError(notConfigured)
+        )
+        XCTAssertFalse(
+            MainMenuProviderPresentation.shouldForceAuthorizationExpiryRow(
+                identifier: .commandCode,
+                errorMessage: notConfigured
+            )
+        )
+    }
 }

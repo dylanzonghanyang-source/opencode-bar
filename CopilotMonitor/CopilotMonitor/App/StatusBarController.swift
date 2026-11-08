@@ -190,8 +190,37 @@ enum MainMenuProviderPresentation {
         .commandCode,
         .zaiCodingPlan,
         .timicc,
-        .deepSeek
+        .deepSeek,
+        .dashScope,
+        .openCodeGo,
+        .xaiSuperGrok
     ]
+
+    /// Terminal command that refreshes each provider's stored credential. Returns
+    /// nil for providers without a specific recovery flow (the generic error text
+    /// already tells the user what to do in those cases).
+    static func credentialRefreshHint(for identifier: ProviderIdentifier) -> String? {
+        switch identifier {
+        case .commandCode:
+            return "Run `cmd logout && cmd login` in Terminal to refresh the CLI API key."
+        case .codex:
+            return "Run `opencode` in Terminal once to refresh the ChatGPT token."
+        case .zaiCodingPlan:
+            return "Generate a new API key at z.ai and update it in Settings."
+        case .deepSeek:
+            return "Generate a new API key at platform.deepseek.com and update it in Settings."
+        case .dashScope:
+            return "Generate a new DashScope API key and update it in Settings."
+        case .timicc:
+            return "Update the TIMICC API key in Settings."
+        case .openCodeGo:
+            return "Update the OpenCode Go API key in Settings."
+        case .xaiSuperGrok:
+            return "Update the SuperGrok API key in Settings."
+        default:
+            return nil
+        }
+    }
 
     /// "Never configured" errors — these providers stay hidden.
     static func isMissingCredentialError(_ errorMessage: String) -> Bool {
@@ -3255,6 +3284,13 @@ final class StatusBarController: NSObject {
         let errorItem = NSMenuItem()
         errorItem.view = createDisabledLabelView(text: "Error: \(errorMessage)", multiline: true)
         submenu.addItem(errorItem)
+
+        if errorMenuStatus(for: errorMessage, identifier: identifier) == .authorizationExpired,
+           let hint = MainMenuProviderPresentation.credentialRefreshHint(for: identifier) {
+            let fixItem = NSMenuItem()
+            fixItem.view = createDisabledLabelView(text: "Fix: \(hint)", multiline: true)
+            submenu.addItem(fixItem)
+        }
 
         if let result,
            let details = result.details,
